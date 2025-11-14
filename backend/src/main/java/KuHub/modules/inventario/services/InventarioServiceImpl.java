@@ -1,7 +1,7 @@
 package KuHub.modules.inventario.services;
 
-import KuHub.modules.inventario.dtos.InventoryWithProductCreateUpdateDTO;
-import KuHub.modules.inventario.dtos.InventoryWithProductoResponseDTO;
+import KuHub.modules.inventario.dtos.InventoryWithProductCreateDTO;
+import KuHub.modules.inventario.dtos.InventoryWithProductResponseAnswerUpdateDTO;
 import KuHub.modules.inventario.entity.Inventario;
 import KuHub.modules.inventario.exceptions.InventarioException;
 import KuHub.modules.inventario.repository.InventarioRepository;
@@ -63,21 +63,21 @@ public class InventarioServiceImpl implements InventarioService {
 
     @Transactional
     @Override
-    public List<InventoryWithProductoResponseDTO> findAllActiveInventoryOrderedByName(){
+    public List<InventoryWithProductResponseAnswerUpdateDTO> findAllActiveInventoryOrderedByName(){
         return inventarioRepository.findAllActiveInventoryOrderedByName();
     }
 
 
     @Transactional
     @Override
-    public InventoryWithProductCreateUpdateDTO  save (InventoryWithProductCreateUpdateDTO inventarioRequest){
+    public InventoryWithProductCreateDTO save (InventoryWithProductCreateDTO inventarioRequest){
         syncSeq();
         //validar que el stock no es negativo
         if (inventarioRequest.getStock() < 0 ){
             throw new InventarioException("El inventario no puede ser negativo");
         }
         //validar que el stock minimo no es negativo
-        if (inventarioRequest.getStockMinimo() < 0){
+        if (inventarioRequest.getStockLimitMin() < 0){
             throw new InventarioException("El stock mínimo no puede ser negativo");
         }
 
@@ -93,7 +93,7 @@ public class InventarioServiceImpl implements InventarioService {
         //Crear inventario de producto con los atributos obtenidos en el frontend y guardarlo
         Inventario newInventario = inventarioRepository.save(
                 new Inventario(null,newProducto.getIdProducto(),newProducto,inventarioRequest.getStock(),
-                        inventarioRequest.getStockMinimo() ));
+                        inventarioRequest.getStockLimitMin() ));
         //retornamos el inventario con los ids para comprobar guardado
         inventarioRequest.setIdInventario(newInventario.getIdInventario());
         inventarioRequest.setIdProducto(newProducto.getIdProducto());
@@ -102,42 +102,49 @@ public class InventarioServiceImpl implements InventarioService {
 
     @Transactional
     @Override
-    public InventoryWithProductCreateUpdateDTO updateInventoryWithProduct(InventoryWithProductCreateUpdateDTO inventarioRequest){
-        //validar que producto e inventario existen
+    public InventoryWithProductResponseAnswerUpdateDTO updateInventoryWithProduct(InventoryWithProductResponseAnswerUpdateDTO req){
+
+        // Validar existencia
         Inventario inventario = inventarioRepository.findByIdInventoryWithProductActive(
-                Math.toIntExact(Long.valueOf(inventarioRequest.getIdInventario())),true).orElseThrow(
-                ()->new InventarioException("El inventario no existe")
+                req.getIdInventario(), true
+        ).orElseThrow(() -> new InventarioException("El inventario no existe"));
+
+        Producto producto = productoService.findByIdProductoAndActivoTrue(
+                req.getIdProducto()
         );
-        Producto producto = productoService.findByIdProductoAndActivoTrue(Math.toIntExact(Long.valueOf(inventarioRequest.getIdProducto())));
 
-        //---VALIDACIONES DE PRODUCTO--
-        //validar que no existe un producto con el mismo nombre antes de actualizar
-        String actualizarNombreProducto = StringUtils.capitalizarPalabras(inventarioRequest.getNombreProducto());
-        if(producto.getNombreProducto().equals(actualizarNombreProducto)){
-            throw new InventarioException("El producto con el nombre " + producto.getNombreProducto() + " ya existe");
+        // Validación nombre
+        String nuevoNombre = StringUtils.capitalizarPalabras(req.getNombreProducto());
+
+        // Si el nombre CAMBIÓ → validar duplicado
+        if (!producto.getNombreProducto().equals(nuevoNombre) &&
+                productoRepository.existsByNombreProductoAndIdProductoIsNot(nuevoNombre, req.getIdProducto())) {
+
+            throw new InventarioException("El producto con el nombre " + nuevoNombre + " ya existe");
         }
-        //Todavía no existe atributo para el cód de producto en el frontend para validar
 
-        //---VALIDACIONES DE INVENTARIO--
-        if (inventarioRequest.getStockMinimo() != null && inventarioRequest.getStockMinimo() < 0) {
+        // Validaciones inventario
+        if (req.getStockLimitMin() != null && req.getStockLimitMin() < 0)
             throw new InventarioException("El stock mínimo no puede ser negativo");
-        }
 
-        if (inventarioRequest.getStock() != null && inventarioRequest.getStock() < 0) {
+        if (req.getStock() != null && req.getStock() < 0)
             throw new InventarioException("El stock no puede ser negativo");
-        }
 
-        //Después de validado se actualiza
-        producto.setNombreProducto(actualizarNombreProducto);
+        // ---- ACTUALIZAR PRODUCTO ----
+        producto.setNombreProducto(nuevoNombre);
+        producto.setDescripcionProducto(req.getDescripcionProducto());  // ← FALTABA
+        producto.setNombreCategoria(req.getNombreCategoria());
+        producto.setUnidadMedida(req.getUnidadMedida());
         productoRepository.save(producto);
 
-        //PENDIENTE -- IMPLEMENTAR AJUSTE O MOVIMIENTO --
-        inventario.setStock(inventarioRequest.getStock());
-        inventario.setStockLimitMin(inventarioRequest.getStockMinimo());
+        // ---- ACTUALIZAR INVENTARIO ----
+        inventario.setStock(req.getStock());
+        inventario.setStockLimitMin(req.getStockLimitMin());
         inventarioRepository.save(inventario);
 
-        return inventarioRequest;
+        return req;
     }
+
 
 
 
