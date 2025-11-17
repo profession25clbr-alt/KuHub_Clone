@@ -84,7 +84,8 @@ public class RecetaServiceImp implements RecetaService{
                     d.getProducto().getIdProducto(),
                     d.getProducto().getNombreProducto(),
                     d.getProducto().getUnidadMedida(),
-                    d.getCantProducto()
+                    d.getCantProducto(),
+                    d.getProducto().getActivo()
             ));
         }
         return new RecipeWithDetailsAnswerUpdateDTO(
@@ -141,7 +142,8 @@ public class RecetaServiceImp implements RecetaService{
                             d.getProducto().getIdProducto(),
                             d.getProducto().getNombreProducto(),
                             d.getProducto().getUnidadMedida(),
-                            d.getCantProducto()
+                            d.getCantProducto(),
+                            d.getProducto().getActivo()
                     ))
                     .collect(Collectors.toList());
 
@@ -247,41 +249,45 @@ public class RecetaServiceImp implements RecetaService{
         return dto ;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ProductoNotFoundException.class)//ESTO SE VA UNA VEZ CONTROLANDO EN EL FROT DE RECETA LOS PRODUCTO INATIVOS
     @Override
     public RecipeWithDetailsAnswerUpdateDTO updateRecipeWithDetails(
             RecipeWithDetailsAnswerUpdateDTO dto
     ){
-        log.info("🔄 Iniciando actualización de receta ID {}", dto.getIdReceta());
+        try {
+            log.info("🔄 Iniciando actualización de receta ID {}", dto.getIdReceta());
+            log.info("📦 DTO recibido: {}", dto); // 🔥 AGREGAR ESTE LOG
 
             // === 1. Cargar solo la receta ===
-        Receta receta = recetaRepository.findByIdRecetaAndActivoRecetaIsTrue(dto.getIdReceta())
-                .orElseThrow(() -> new RecetaException(
-                        "No existe receta activa con id " + dto.getIdReceta()
-                ));
+            Receta receta = recetaRepository.findByIdRecetaAndActivoRecetaIsTrue(dto.getIdReceta())
+                    .orElseThrow(() -> new RecetaException(
+                            "No existe receta activa con id " + dto.getIdReceta()
+                    ));
 
-        // ============================
-        // === 2. Cambios en Receta ===
-        // ============================
-        if (dto.isCambioReceta()) {
-            log.info("✏️  Detectado cambio en RECETA ID {}", dto.getIdReceta());
-            log.debug("Antes -> nombre: {}, desc: {}, instr: {}",
-                    receta.getNombreReceta(),
-                    receta.getDescripcionReceta(),
-                    receta.getInstruccionesReceta()
-            );
+            log.info("✅ Receta encontrada: {}", receta); // 🔥 AGREGAR ESTE LOG
 
-            receta.setNombreReceta(dto.getNombreReceta());
-            receta.setDescripcionReceta(dto.getDescripcionReceta());
-            receta.setInstruccionesReceta(dto.getInstrucciones());
-            receta.setEstadoReceta(dto.getEstadoReceta());
+            // === 2. Cambios en Receta ===
+            if (dto.isCambioReceta()) {
+                log.info("✏️  Detectado cambio en RECETA ID {}", dto.getIdReceta());
 
-            log.debug("Después -> nombre: {}, desc: {}, instr: {}",
-                    dto.getNombreReceta(),
-                    dto.getDescripcionReceta(),
-                    dto.getInstrucciones()
-            );
-        }
+                // 🔥 AGREGAR VALIDACIÓN DEL ESTADO
+                if (dto.getEstadoReceta() == null) {
+                    log.error("❌ estadoReceta es NULL en el DTO");
+                    throw new RecetaException("El estado de la receta no puede ser nulo");
+                }
+
+                log.info("🔍 Estado recibido: {}", dto.getEstadoReceta());
+                log.info("🔍 Tipo de estado: {}", dto.getEstadoReceta().getClass().getName());
+
+                receta.setNombreReceta(dto.getNombreReceta());
+                receta.setDescripcionReceta(dto.getDescripcionReceta());
+                receta.setInstruccionesReceta(dto.getInstrucciones());
+                receta.setEstadoReceta(dto.getEstadoReceta());
+
+                log.info("✅ Campos de receta actualizados correctamente");
+            }
+
+
         //Actualizacion en el dto para retorna el mismo dto
         dto.setNombreReceta(StringUtils.capitalize(receta.getNombreReceta()));
         // =============================================
@@ -314,19 +320,42 @@ public class RecetaServiceImp implements RecetaService{
                         DetalleRecetaIdProductoProjection::getCantProducto
                 ));
 
+        // ==============================================
+        // === FILTRAR productos INACTIVOS del DTO ======
+        // ==============================================
+            List<RecipeItemDTO> itemsFiltrados = dto.getListaItems().stream()
+                    .filter(item -> {
+                        Producto p = productoService.findById(item.getIdProducto());
+
+                        if (p == null) {
+                            log.warn("⚠️ Producto {} no existe → removido", item.getIdProducto());
+                            return false;
+                        }
+
+                        if (!p.getActivo()) {
+                            log.warn("⚠️ Producto {} INACTIVO → removido", item.getIdProducto());
+                            return false;
+                        }
+
+                        return true; // activo → OK
+                    })
+                    .collect(Collectors.toList());
+
+        dto.setListaItems(itemsFiltrados);
+        log.info("🔎 Lista final filtrada (solo productos activos): {}", itemsFiltrados);
+
+        // Ahora sí se puede construir los sets correctamente
         Set<Integer> oldIds = oldMap.keySet();
-        Set<Integer> newIds = dto.getListaItems()
-                .stream()
+        Set<Integer> newIds = dto.getListaItems().stream()
                 .map(RecipeItemDTO::getIdProducto)
                 .collect(Collectors.toSet());
-
 
         // =======================================================
         // === VALIDACIÓN AGREGADA: detectar SI hay cambios reales ===
         // =======================================================
         boolean hayCambiosReales = false;
 
-        // 1. Si hay producto nuevo → hay cambios
+        // Si hay producto nuevo → hay cambios
         for (RecipeItemDTO item : dto.getListaItems()) {
             if (!oldIds.contains(item.getIdProducto())) {
                 hayCambiosReales = true;
@@ -335,7 +364,7 @@ public class RecetaServiceImp implements RecetaService{
             }
         }
 
-        // 2. Si hay producto eliminado → hay cambios
+        // Si hay producto eliminado → hay cambios
         if (!hayCambiosReales) {
             for (Integer idOld : oldIds) {
                 if (!newIds.contains(idOld)) {
@@ -346,7 +375,7 @@ public class RecetaServiceImp implements RecetaService{
             }
         }
 
-        // 3. Si cambió la cantidad → hay cambios
+        // Si cambió la cantidad → hay cambios
         if (!hayCambiosReales) {
             for (RecipeItemDTO item : dto.getListaItems()) {
                 Double oldCant = oldMap.get(item.getIdProducto());
@@ -373,34 +402,30 @@ public class RecetaServiceImp implements RecetaService{
         // === FIN VALIDACIÓN — continúa tu código normalmente ===
         // =======================================================
 
-
-
         // === Inserts nuevos ===
-        for (RecipeItemDTO item : dto.getListaItems()) {
-            if (!oldIds.contains(item.getIdProducto())) {
-                log.info("➕ INSERT detalle: producto {} (cantidad {})",
-                        item.getIdProducto(),
-                        item.getCantUnidadMedida()
-                );
+            // === Inserts nuevos ===
+            for (RecipeItemDTO item : dto.getListaItems()) {
 
-                Producto prod; // <-- declarar aquí
+                if (!oldIds.contains(item.getIdProducto())) {
 
-                try {
-                    prod = productoService.findByIdProductoAndActivoTrue(item.getIdProducto());
-                } catch (ProductoNotFoundException ex) {
-                    log.warn("⚠️ Producto {} no existe o está inactivo. Se ignora el INSERT.",
-                            item.getIdProducto());
-                    continue; // saltamos este item, sin romper todo el update
+                    log.info("➕ INSERT detalle: producto {} (cantidad {})",
+                            item.getIdProducto(),
+                            item.getCantUnidadMedida()
+                    );
+
+                    // Ya está filtrado → no es necesario validar activo
+                    Producto prod = productoService.findByIdProductoAndActivoTrue(
+                            item.getIdProducto()
+                    );
+
+                    DetalleReceta nuevo = new DetalleReceta();
+                    nuevo.setReceta(receta);
+                    nuevo.setProducto(prod);
+                    nuevo.setCantProducto(item.getCantUnidadMedida());
+
+                    detalleRecetaService.save(nuevo);
                 }
-
-                DetalleReceta nuevo = new DetalleReceta();
-                nuevo.setReceta(receta);
-                nuevo.setProducto(prod);
-                nuevo.setCantProducto(item.getCantUnidadMedida());
-
-                detalleRecetaService.save(nuevo);
             }
-        }
 
 
         // === Updates en cantidades ===
@@ -434,8 +459,6 @@ public class RecetaServiceImp implements RecetaService{
             }
         }
 
-
-
         // === Guardar solo si hubo cambio en receta ===
         if (dto.isCambioReceta()) {
             recetaRepository.save(receta);
@@ -445,6 +468,13 @@ public class RecetaServiceImp implements RecetaService{
         // === Retornar DTO final ===
         log.info("✅ Actualización completa para receta ID {}", receta.getIdReceta());
         return dto;
+        } catch (RecetaException e) {
+            log.error("❌ RecetaException: {}", e.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            log.error("💥 Error inesperado al actualizar receta", e);
+            throw new RecetaException("Error al actualizar receta: " + e.getMessage());
+        }
     }
 
     /*
@@ -505,36 +535,32 @@ public class RecetaServiceImp implements RecetaService{
 
     @Transactional
     @Override
-    public void updateStatusActiveFalseRecipeWithDetails(Integer idReceta) {
+    public void updateDeleteStatusActiveFalseRecipeWithDetails(Integer idReceta) {
 
         log.info("🚫 Iniciando eliminación lógica de receta {}", idReceta);
 
         // 1. Obtener receta activa
         Receta receta = findByIdRecetaAndActivoRecetaIsTrue(idReceta);
 
-        // Si ya está inactiva → no hacer nada
-        if (!receta.getActivoReceta()) {
-            log.info("ℹ️ Receta {} ya estaba inactiva. No se realizan cambios.", idReceta);
-        }
-
-        // 2. Marcar receta como inactiva
+        // 2. Marcar como inactiva
         receta.setActivoReceta(false);
         recetaRepository.save(receta);
 
         log.info("✔ Receta {} marcada como inactiva", idReceta);
+        log.info("🏁 Proceso finalizado. No se eliminan detalles por política del sistema.");
+    }
 
-        List<DetalleReceta> detalles = detalleRecetaService.findAllByReceta(receta);
+    @Transactional
+    @Override
+    public void updateChangingStatusRecipeWith(Integer idReceta){
+        Receta receta = findByIdRecetaAndActivoRecetaIsTrue(idReceta);
 
-        if (detalles.isEmpty()) {
-            log.info("ℹ️ Receta {} no tiene detalles. Proceso completado.", idReceta);
+        if(receta.getEstadoReceta() == Receta.EstadoRecetaType.ACTIVO){
+            receta.setEstadoReceta(Receta.EstadoRecetaType.INACTIVO);
+        }else{
+            receta.setEstadoReceta(Receta.EstadoRecetaType.ACTIVO);
         }
-
-        log.info("ℹ️ Receta {} tiene {} detalles. No se eliminara debido al futuro uso en historiales.",
-                idReceta, detalles.size());
-
-        log.info("🏁 Proceso de eliminación lógica finalizado para receta {}", idReceta);
-
-
+        recetaRepository.save(receta);
     }
 
 
