@@ -6,13 +6,18 @@ import KuHub.modules.gestionusuario.entity.Usuario;
 import KuHub.modules.gestionusuario.exceptions.*;
 import KuHub.modules.gestionusuario.repository.RolRepository;
 import KuHub.modules.gestionusuario.repository.UsuarioRepository;
+import KuHub.utils.ImagenUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
+
 
 /**
  * Implementación del servicio de Usuarios
@@ -113,7 +118,26 @@ public class UsuarioServiceImpl implements UsuarioService {
         // En producción, hashear la contraseña con BCrypt
         usuario.setContrasena(usuarioRequestDTO.getContrasena());
 
-        usuario.setFotoPerfil(usuarioRequestDTO.getFotoPerfil());
+        // FOTO PERFIL: convertir Base64 a byte[]
+        if (usuarioRequestDTO.getFotoPerfil() != null
+                && !usuarioRequestDTO.getFotoPerfil().isEmpty()) {
+
+            try {
+                byte[] fotoBytes = Base64.getDecoder().decode(usuarioRequestDTO.getFotoPerfil());
+
+                // Validar tamaño máximo 10MB
+                if (fotoBytes.length > 10 * 1024 * 1024) {
+                    // Foto demasiado grande → se ignora y se guarda NULL
+                    usuario.setFotoPerfil(null);
+                } else {
+                    usuario.setFotoPerfil(fotoBytes);
+                }
+
+            } catch (IllegalArgumentException e) {
+                // Base64 inválido → se guarda NULL sin afectar la transacción
+                usuario.setFotoPerfil(null);
+            }
+        }
         usuario.setActivo(usuarioRequestDTO.getActivo() != null ? usuarioRequestDTO.getActivo() : true);
         usuario.setFechaCreacion(LocalDateTime.now());
 
@@ -177,8 +201,22 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         // Actualizar foto de perfil si se proporciona
-        if (usuarioUpdateDTO.getFotoPerfil() != null) {
-            usuario.setFotoPerfil(usuarioUpdateDTO.getFotoPerfil());
+        if (usuarioUpdateDTO.getFotoPerfil() != null && !usuarioUpdateDTO.getFotoPerfil().isEmpty()) {
+            try {
+                byte[] fotoBytes = Base64.getDecoder().decode(usuarioUpdateDTO.getFotoPerfil());
+
+                // Validar tamaño máximo 10MB
+                if (fotoBytes.length > 10 * 1024 * 1024) {
+                    throw new IllegalArgumentException("La foto no puede superar 10MB");
+                }
+
+                usuario.setFotoPerfil(fotoBytes);
+
+            } catch (IllegalArgumentException e) {
+                // Base64 malformado u otro error → se inserta null sin detener la transacción
+                usuario.setFotoPerfil(null);
+                System.out.println("⚠️ Imagen inválida. Se guardó 'null' y el proceso continúa.");
+            }
         }
 
         // Actualizar estado si se proporciona
@@ -230,14 +268,37 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     @Transactional
-    public UsuarioResponseDTO actualizarFotoPerfil(Integer idUsuario, String fotoPerfil) {
+    public UsuarioResponseDTO actualizarFotoPerfil(Integer idUsuario, MultipartFile foto) {
+
         Usuario usuario = usuarioRepository.findById(idUsuario)
                 .orElseThrow(() -> new UsuarioNotFoundException(idUsuario));
 
-        usuario.setFotoPerfil(fotoPerfil);
+        if (foto != null && !foto.isEmpty()) {
+            try {
+                byte[] fotoBytes = foto.getBytes();
+
+                // Validar tamaño máximo 10MB
+                if (fotoBytes.length > 10 * 1024 * 1024) {
+                    throw new IllegalArgumentException("La foto no puede superar 10MB");
+                }
+
+                // Validar que realmente es una imagen (JPG, PNG, etc.)
+                if (!ImagenUtils.esImagenValida(fotoBytes)) {
+                    throw new IllegalArgumentException("El archivo no es una imagen válida (JPG/PNG).");
+                }
+
+                usuario.setFotoPerfil(fotoBytes);
+
+            } catch (IOException e) {
+                throw new RuntimeException("Error al leer el archivo", e);
+            }
+        }
+
         Usuario usuarioActualizado = usuarioRepository.save(usuario);
         return convertirADTO(usuarioActualizado);
     }
+
+
 
     @Override
     @Transactional
@@ -298,25 +359,37 @@ public class UsuarioServiceImpl implements UsuarioService {
      * ⭐ IMPORTANTE: Convierte el nombre del rol ENUM al formato legible
      */
     private UsuarioResponseDTO convertirADTO(Usuario usuario) {
-        UsuarioResponseDTO dto = new UsuarioResponseDTO();
-        dto.setIdUsuario(usuario.getIdUsuario());
-        dto.setIdRol(usuario.getRol().getIdRol());
+        String fotoBase64 = null;
 
-        // ⭐ Convertir nombre de rol de ENUM a formato legible
-        dto.setNombreRol(convertirNombreRolEnumALegible(usuario.getRol().getNombreRol()));
+        if (usuario.getFotoPerfil() != null && usuario.getFotoPerfil().length > 0) {
+            try {
+                // Validar si es imagen real
+                if (ImagenUtils.esImagenValida(usuario.getFotoPerfil())) {
+                    fotoBase64 = Base64.getEncoder().encodeToString(usuario.getFotoPerfil());
+                }
+                // Si NO es una imagen válida, fotoBase64 queda en null
+            } catch (Exception e) {
+                // Cualquier error → dejamos fotoBase64 como null
+                fotoBase64 = null;
+            }
+        }
 
-        dto.setPrimerNombre(usuario.getPrimerNombre());
-        dto.setSegundoNombre(usuario.getSegundoNombre());
-        dto.setApellidoPaterno(usuario.getApellidoPaterno());
-        dto.setApellidoMaterno(usuario.getApellidoMaterno());
-        dto.setNombreCompleto(usuario.getNombreCompleto());
-        dto.setEmail(usuario.getEmail());
-        dto.setUsername(usuario.getUsername());
-        dto.setFotoPerfil(usuario.getFotoPerfil());
-        dto.setActivo(usuario.getActivo());
-        dto.setFechaCreacion(usuario.getFechaCreacion());
-        dto.setUltimoAcceso(usuario.getUltimoAcceso());
-        return dto;
+        return new UsuarioResponseDTO(
+                usuario.getIdUsuario(),
+                usuario.getRol().getIdRol(),
+                convertirNombreRolEnumALegible(usuario.getRol().getNombreRol()),
+                usuario.getPrimerNombre(),
+                usuario.getSegundoNombre(),
+                usuario.getApellidoPaterno(),
+                usuario.getApellidoMaterno(),
+                usuario.getNombreCompleto(),
+                usuario.getEmail(),
+                usuario.getUsername(),
+                fotoBase64,
+                usuario.getActivo(),
+                usuario.getFechaCreacion(),
+                usuario.getUltimoAcceso()
+        );
     }
 
     /**
