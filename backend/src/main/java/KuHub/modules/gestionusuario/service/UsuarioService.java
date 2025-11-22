@@ -21,6 +21,16 @@ public interface UsuarioService {
     List<UsuarioResponseDTO> obtenerActivos();
 
     /**
+     * Obtiene nombre completo del usuario
+     */
+    String obtenerNombreCompleto(UsuarioResponseDTO dto);
+
+    /**
+     * Obtiene docentes ACTIVOS por el nombre de rol
+     */
+    List<UsuarioResponseDTO> obtenerDocentesYProfesoresActivos();
+
+    /**
      * Obtiene un usuario por su ID
      */
     UsuarioResponseDTO obtenerPorId(Integer idUsuario);
@@ -39,6 +49,8 @@ public interface UsuarioService {
      * Obtiene usuarios por rol
      */
     List<UsuarioResponseDTO> obtenerPorRol(Integer idRol);
+
+
 
     /**
      * Crea un nuevo usuario

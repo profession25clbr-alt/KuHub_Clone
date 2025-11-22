@@ -7,6 +7,7 @@ import KuHub.modules.gestionusuario.exceptions.*;
 import KuHub.modules.gestionusuario.repository.RolRepository;
 import KuHub.modules.gestionusuario.repository.UsuarioRepository;
 import KuHub.utils.ImagenUtils;
+import KuHub.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 /**
@@ -45,6 +47,32 @@ public class UsuarioServiceImpl implements UsuarioService {
     public List<UsuarioResponseDTO> obtenerActivos() {
         return usuarioRepository.findByActivoTrue()
                 .stream()
+                .map(this::convertirADTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public String obtenerNombreCompleto(UsuarioResponseDTO dto){
+        return StringUtils.capitalizarPalabras(Stream.of(
+                        dto.getPrimerNombre(),
+                        dto.getSegundoNombre(),
+                        dto.getApellidoPaterno(),
+                        dto.getApellidoMaterno()
+                )
+                .filter(s -> s != null && !s.isBlank())  // elimina null y vacíos
+                .collect(Collectors.joining(" ")));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UsuarioResponseDTO> obtenerDocentesYProfesoresActivos() {
+        return usuarioRepository.findAll().stream()
+                .filter(u ->
+                        u.getActivo() && (
+                                "DOCENTE".equalsIgnoreCase(u.getRol().getNombreRol()) ||
+                                        "PROFESOR_A_CARGO".equalsIgnoreCase(u.getRol().getNombreRol())
+                        )
+                )
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }

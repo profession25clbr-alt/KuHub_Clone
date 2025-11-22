@@ -1,0 +1,14 @@
+package KuHub.modules.gestion_academica.sevice;
+
+import KuHub.modules.gestion_academica.entity.Sala;
+
+import java.util.List;
+
+public interface SalaService {
+    Sala findById(Integer id);
+    List<Sala> findAll();
+    Boolean existsByCodSala(String codSala);
+    Sala save (Sala sala);
+    void softDelete(Integer id);
+
+}
