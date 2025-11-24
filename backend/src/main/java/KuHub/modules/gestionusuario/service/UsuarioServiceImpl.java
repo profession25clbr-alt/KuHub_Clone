@@ -87,6 +87,13 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     @Transactional(readOnly = true)
+    public Usuario obtenerPorIdEntidad(Integer idUsuario){
+        return usuarioRepository.findById(idUsuario)
+                .orElseThrow(() -> new UsuarioNotFoundException(idUsuario));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public UsuarioResponseDTO obtenerPorEmail(String email) {
         Usuario usuario = usuarioRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new UsuarioNotFoundException("email", email));
@@ -386,7 +393,8 @@ public class UsuarioServiceImpl implements UsuarioService {
      * Convierte una entidad Usuario a DTO
      * ⭐ IMPORTANTE: Convierte el nombre del rol ENUM al formato legible
      */
-    private UsuarioResponseDTO convertirADTO(Usuario usuario) {
+    @Override
+    public UsuarioResponseDTO convertirADTO(Usuario usuario) {
         String fotoBase64 = null;
 
         if (usuario.getFotoPerfil() != null && usuario.getFotoPerfil().length > 0) {

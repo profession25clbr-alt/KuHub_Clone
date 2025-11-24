@@ -23,4 +23,13 @@ public class BloqueHorario {
 
     @Column(name = "hora_fin", nullable = false)
     private LocalTime horaFin;
+
+    /** 24/11/25 fecha de modificacion de la bbdd
+     *  CREATE TABLE bloque_horario (
+     *     id_bloque INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+     *     numero_bloque INTEGER UNIQUE NOT NULL,
+     *     hora_inicio TIME NOT NULL,
+     *     hora_fin TIME NOT NULL
+     * );
+     * */
 }

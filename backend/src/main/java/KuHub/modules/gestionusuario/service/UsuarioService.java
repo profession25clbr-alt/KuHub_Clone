@@ -1,6 +1,7 @@
 package KuHub.modules.gestionusuario.service;
 
 import KuHub.modules.gestionusuario.dtos.*;
+import KuHub.modules.gestionusuario.entity.Usuario;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -34,6 +35,11 @@ public interface UsuarioService {
      * Obtiene un usuario por su ID
      */
     UsuarioResponseDTO obtenerPorId(Integer idUsuario);
+
+    /**
+     * Obtiene un usuario por su ID a la forma de entidade
+     */
+    Usuario obtenerPorIdEntidad(Integer idUsuario);
 
     /**
      * Obtiene un usuario por su email
@@ -101,4 +107,9 @@ public interface UsuarioService {
      * Obtiene estadísticas de usuarios
      */
     UsuarioEstadisticasDTO obtenerEstadisticas();
+
+    /**
+     * Convierte un usuario en un DTO ahora publico
+     */
+    UsuarioResponseDTO convertirADTO(Usuario usuario);
 }

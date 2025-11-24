@@ -28,7 +28,10 @@ public class ReservaSala {
     private Sala sala;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_bloque", referencedColumnName = "numero_bloque", nullable = false)
+    @JoinColumn(
+            name = "id_bloque",
+            nullable = false
+    )
     private BloqueHorario bloqueHorario;
 
     // ----------- Campos simples -----------
@@ -46,4 +49,21 @@ public class ReservaSala {
         SABADO,
         DOMINGO
     }
+
+    /** 24/11/25 fecha mod en la bbdd
+     * -- Tabla reserva_sala
+     * CREATE TABLE reserva_sala (
+     *     id_reserva_sala INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+     *     id_seccion      INTEGER NOT NULL,
+     *     id_sala         INTEGER NOT NULL,
+     *     dia_semana      dia_semana_type NOT NULL,
+     *     bloque_horario  INTEGER NOT NULL,
+     *     CONSTRAINT fk_reserva_sala_seccion
+     *         FOREIGN KEY (id_seccion) REFERENCES seccion(id_seccion),
+     *     CONSTRAINT fk_reserva_sala_sala
+     *         FOREIGN KEY (id_sala) REFERENCES sala(id_sala),
+     *     CONSTRAINT fk_reserva_sala_bloque
+     *         FOREIGN KEY (bloque_horario) REFERENCES bloque_horario(numero_bloque)
+     * );
+     * */
 }

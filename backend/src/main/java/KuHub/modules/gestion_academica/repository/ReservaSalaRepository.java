@@ -28,13 +28,13 @@ public interface ReservaSalaRepository extends JpaRepository<ReservaSala, Intege
      * @return Lista de bloques horarios reservados (proyección NumberBlockProjection).
      */
     @Query(value = """
-    select distinct b.numero_bloque as bloqueHorarioNumeroBloque
-    from reserva_sala r
-    join sala s on s.id_sala = r.id_sala
-    join bloque_horario b on r.id_bloque = b.id_bloque
-    where r.id_sala = :idSala
-      and s.activo = true
-      and r.dia_semana = cast(:diaSemana as dia_semana_type)
+        SELECT DISTINCT b.numero_bloque AS bloqueHorarioNumeroBloque
+        FROM reserva_sala r
+        JOIN sala s ON s.id_sala = r.id_sala
+        JOIN bloque_horario b on r.id_bloque = b.id_bloque
+            WHERE r.id_sala = :idSala
+              AND s.activo = TRUE
+              AND r.dia_semana = cast(:diaSemana AS dia_semana_type)
 """, nativeQuery = true)
     List<NumberBlockProjection> findDistinctBySalaIdSalaAndSalaActivoTrueAndDiaSemana(
             @Param("idSala") Integer idSala,

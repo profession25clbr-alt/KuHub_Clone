@@ -3,13 +3,11 @@ package KuHub.modules.gestion_academica.sevice;
 import KuHub.modules.gestion_academica.dtos.dtoentity.SeccionEntityResponseDTO;
 import KuHub.modules.gestion_academica.dtos.dtomodel.BookTImeBlocksRequestDTO;
 import KuHub.modules.gestion_academica.dtos.dtomodel.SectionCreateDTO;
-import KuHub.modules.gestion_academica.entity.BloqueHorario;
-import KuHub.modules.gestion_academica.entity.ReservaSala;
-import KuHub.modules.gestion_academica.entity.Sala;
-import KuHub.modules.gestion_academica.entity.Seccion;
+import KuHub.modules.gestion_academica.entity.*;
 import KuHub.modules.gestion_academica.exceptions.SeccionException;
 import KuHub.modules.gestion_academica.repository.SeccionRepository;
 import KuHub.modules.gestionusuario.dtos.UsuarioResponseDTO;
+import KuHub.modules.gestionusuario.entity.Usuario;
 import KuHub.modules.gestionusuario.service.UsuarioService;
 import KuHub.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +37,9 @@ public class SeccionServiceImp implements SeccionService{
 
     @Autowired
     private BloqueHorarioService bloqueHorarioService;
+
+    @Autowired
+    private DocenteSeccionService docenteSeccionService;
 
     @Transactional(readOnly = true)
     @Override
@@ -92,7 +93,7 @@ public class SeccionServiceImp implements SeccionService{
         }
 
         String parsearNombre = StringUtils.normalizeSpaces(seccion.getNombreSeccion());
-        if(seccionRepository.existsByAsignatura_IdAsignaturaAndNombreSeccion(seccion.getAsignatura().getIdAsignatura(), parsearNombre)){
+        if(seccionRepository.existsByAsignaturaTrueAndSeccionTrueAndNombreSeccionIlike(seccion.getAsignatura().getIdAsignatura(), parsearNombre)){
             throw new SeccionException("Ya existe una seccion con el nombre: " + seccion.getNombreSeccion() + " en misma asignatura la asignatura: " + seccion.getAsignatura().getNombreAsignatura());
         }
 
@@ -113,32 +114,6 @@ public class SeccionServiceImp implements SeccionService{
     @Transactional
     @Override
     public SectionCreateDTO createSection (SectionCreateDTO dto){
-        /**Validar existencia de asignatura y que este activa*/
-        if ( dto.getIdAsignatura()!= null) {
-            if (!asignaturaService.existsByIdAsignaturaAndTrue(dto.getIdAsignatura())){
-                throw new SeccionException("La asignatura con el id: " + dto.getIdAsignatura() + " no existe");
-            }
-        }else {
-            throw new SeccionException("Debe indicar una asignatura válida");
-        }
-        /**Validar duplicidad de nombre en la misma asignatura*/
-        if (dto.getNombreSeccion() != null && !dto.getNombreSeccion().isBlank()) {
-            String parsearNombre = StringUtils.normalizeSpaces(dto.getNombreSeccion());
-            if(seccionRepository.existsByAsignatura_IdAsignaturaAndNombreSeccion(dto.getIdAsignatura(), parsearNombre)){
-                throw new SeccionException("Ya existe una seccion con el nombre: " + dto.getNombreSeccion() + " en misma asignatura la asignatura: " + dto.getIdAsignatura());
-            }
-        }else {
-            throw new SeccionException("No se puede crear una seccion sin nombre");
-        }
-        /**Validar existencia de usuario ademas si es docente o profesor*/
-        UsuarioResponseDTO docente = usuarioService.obtenerPorId(dto.getIdUsuarioDocente());
-        boolean esRolValido =
-                docente.getNombreRol().equalsIgnoreCase("DOCENTE") ||
-                        docente.getNombreRol().equalsIgnoreCase("PROFESOR_A_CARGO");
-        boolean esActivo = docente.getActivo();
-        if(!esRolValido || !esActivo){
-            throw new SeccionException("Los usuario registrados a la seccion solo pueden ser docentes o profesores");
-        }
         /***validar capacidad maxima y cantidad de inscritos */
         if (dto.getCantInscritos() < 0 || dto.getCapacidadMaxInscritos() < 0){
             throw new SeccionException("La capacidad maxima y cantidad de incritos no pueden ser negativas");
@@ -147,16 +122,53 @@ public class SeccionServiceImp implements SeccionService{
             throw new SeccionException("La cantidad de inscritos no puede ser mayor a la capacidad maxima");
         }
 
+        /**Validar existencia de asignatura y que este activa*/
+        if ( dto.getIdAsignatura()!= null) {
+            if (!asignaturaService.existsByIdAsignaturaAndTrue(dto.getIdAsignatura())){
+                throw new SeccionException("La asignatura con el id: " + dto.getIdAsignatura() + " no existe");
+            }
+        }else {
+            throw new SeccionException("Debe indicar una asignatura válida");
+        }
+
+        /**Validar duplicidad de nombre de la seccion en la misma asignatura*/
+        if (dto.getNombreSeccion() != null && !dto.getNombreSeccion().isBlank()) {
+            String parsearNombre = StringUtils.normalizeSpaces(dto.getNombreSeccion());
+            if(seccionRepository.existsByAsignaturaTrueAndSeccionTrueAndNombreSeccionIlike(dto.getIdAsignatura(), parsearNombre)){
+                throw new SeccionException("Ya existe una seccion con el nombre: " + dto.getNombreSeccion()
+                                            + " en misma asignatura la asignatura: " + dto.getIdAsignatura()
+                );
+            }
+        }else {
+            throw new SeccionException("No se puede crear una seccion sin nombre");
+        }
+
+        /**Validar existencia de usuario y que sea docente o profesor */
+        Usuario docente = usuarioService.obtenerPorIdEntidad(dto.getIdUsuarioDocente());
+        boolean esActivo = docente.getActivo();
+        boolean esRolValido = false;
+        try {
+            Seccion.RolValido.valueOf(docente.getRol().getNombreRol().toUpperCase());
+            esRolValido = true; // Si no lanza excepción, el rol es válido
+        } catch (IllegalArgumentException e) {
+            esRolValido = false; // Rol no permitido
+        }
+        if(!esRolValido || !esActivo){
+            throw new SeccionException("Los usuario registrados a la seccion solo pueden ser docentes o profesores");
+        }
+
         /**Crear seccion*/
         Seccion seccion = seccionRepository.save( new Seccion(
                 null,
                 asignaturaService.findById(dto.getIdAsignatura()),
-                dto.getNombreSeccion(), dto.getCapacidadMaxInscritos(),
-                dto.getCantInscritos(), true, Seccion.EstadoSeccion.ACTIVA));
+                StringUtils.normalizeSpaces(dto.getNombreSeccion()),
+                dto.getCapacidadMaxInscritos(),
+                dto.getCantInscritos(),
+                true,
+                Seccion.EstadoSeccion.ACTIVA));
 
-        /**FALTA INSERTAR DOCENTE Y SECCION EN LA TABLA INTERMEDIA docente_seccion */
-
-        if (dto.getCrearSala()) {
+        /** Procesa siempre los bloques (crea sala sólo cuando corresponde)*/
+        if (dto.getBloquesHorarios() != null) {
             /**
              * Procesa los bloques de tiempo de la sección,
              * creando sala solo si corresponde, pero siempre validando los bloques.
@@ -216,7 +228,7 @@ public class SeccionServiceImp implements SeccionService{
                 if (!disponible) {
                     throw new SeccionException(
                             "El bloque " + B.getNumeroBloque() +
-                                    " ya está reservado para la sala id: " + salaId
+                                    " ya está reservado para una sala en una seccion"
                     );
                 }
 
@@ -236,9 +248,18 @@ public class SeccionServiceImp implements SeccionService{
             }
         }
 
+        /**SE INSETA a la tabla intermedia DocenteSeccion, el save no tiene restricciones, en un futuro puede ser que si
+         * esto significa que pueda cambiar el guadardo, la otra opcion es llamar el repo justo en esta parte */
+        docenteSeccionService.save(new DocenteSeccion(
+                null,
+                docente,
+                seccion,
+                null
+        ));
+
+        /**Estos atributos son meramente visuale, debido en las tablas se asignan valores por defecto*/
         /**Obtener nombre completo del docente usando metodo*/
-        dto.setNombreCompletoDocente(usuarioService.obtenerNombreCompleto(docente));
-        /**Validar bloques*/
+        dto.setNombreCompletoDocente(usuarioService.obtenerNombreCompleto(usuarioService.convertirADTO(docente)));
         /**Asignar valores por defecto*/
         dto.setEstadoSeccion(Seccion.EstadoSeccion.ACTIVA);
 
