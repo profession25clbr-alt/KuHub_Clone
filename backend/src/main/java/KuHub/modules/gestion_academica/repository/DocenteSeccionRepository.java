@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface DocenteSeccionRepository extends JpaRepository <DocenteSeccion, Integer>{
 
     Optional<DocenteSeccion> findByUsuario_IdUsuarioAndSeccion_IdSeccion(Integer docenteIdDocente, Integer seccionIdSeccion);
+    Optional<DocenteSeccion> findBySeccion_IdSeccion(Integer idSeccion);
 }

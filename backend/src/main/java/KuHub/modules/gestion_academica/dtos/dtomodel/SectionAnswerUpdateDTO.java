@@ -14,7 +14,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
-public class SectionCreateDTO {
+public class SectionAnswerUpdateDTO {
+    @NotNull
+    private Integer idSeccion;
     @NotNull
     private Integer idAsignatura;
     @NotEmpty
@@ -22,7 +24,7 @@ public class SectionCreateDTO {
     private String nombreSeccion;
     private Seccion.EstadoSeccion estadoSeccion;
     @NotNull
-    private Integer idUsuarioDocente;
+    private Integer idDocente;
     private String NombreCompletoDocente;
     @NotNull
     private Integer capacidadMaxInscritos;
@@ -32,5 +34,4 @@ public class SectionCreateDTO {
     @Valid
     private List<BookTImeBlocksRequestDTO> bloquesHorarios;
     private Boolean crearSala;
-
 }

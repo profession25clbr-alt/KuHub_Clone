@@ -16,15 +16,15 @@ public class BookTImeBlocksRequestDTO {
     @NotNull
     private Integer numeroBloque;
     @NotNull
-    private LocalTime horaInicio;
+    private String horaInicio;
     @NotNull
-    private LocalTime horaFin;
+    private String horaFin;
     @NotNull
     private ReservaSala.DiaSemana diaSemana;
     @NotNull
     private Integer idSala;
     @NotEmpty
-    private String CodSala;
+    private String codSala;
     @NotEmpty
     private String nombreSala;
 }

@@ -1,9 +1,8 @@
 package KuHub.modules.gestion_academica.sevice;
 
+import KuHub.modules.gestion_academica.dtos.dtomodel.FilterTimeBlockRequestDTO;
 import KuHub.modules.gestion_academica.entity.BloqueHorario;
-import KuHub.modules.gestion_academica.entity.ReservaSala;
-import KuHub.modules.gestion_academica.entity.Sala;
-import KuHub.modules.gestion_academica.exceptions.BloqueHorarioException;
+import KuHub.modules.gestion_academica.exceptions.GestionAcademicaException;
 import KuHub.modules.gestion_academica.repository.BloqueHorarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,7 +23,7 @@ public class BloqueHorarioServiceImp implements BloqueHorarioService{
     @Override
     public BloqueHorario findById(Integer id) {
         return bloqueHorarioRepository.findById(id).orElseThrow(
-                ()-> new BloqueHorarioException("El bloque de horario con el id: " + id + " no existe")
+                ()-> new GestionAcademicaException("El bloque de horario con el id: " + id + " no existe")
         );
     }
 
@@ -32,7 +31,7 @@ public class BloqueHorarioServiceImp implements BloqueHorarioService{
     @Override
     public BloqueHorario findByNumberBlock (Integer numberBlock){
         return bloqueHorarioRepository.findByNumeroBloque(numberBlock).orElseThrow(
-                ()-> new BloqueHorarioException("El bloque de horario con el numero: " + numberBlock + " no existe")
+                ()-> new GestionAcademicaException("El bloque de horario con el numero: " + numberBlock + " no existe")
         );
     }
 
@@ -45,16 +44,18 @@ public class BloqueHorarioServiceImp implements BloqueHorarioService{
     @Transactional
     @Override
     public List<BloqueHorario> filterBlocksByNumbersBlocks(List<Integer> numbersBlocksFilter){
-         if (numbersBlocksFilter == null || numbersBlocksFilter.isEmpty()){
-             throw new BloqueHorarioException("No se puede filtrar por ningun bloque de horario");
-         }
+        if (numbersBlocksFilter == null || numbersBlocksFilter.isEmpty()) {
+
+            return bloqueHorarioRepository.findAll();
+        }
          return bloqueHorarioRepository.findByNumeroBloqueNotIn(numbersBlocksFilter);
     }
 
     @Transactional(readOnly = true)
     @Override
-    public List<BloqueHorario> filterBlocksByDayWeekAndIdRoom(Integer idSala, String diaSemana){
-        List<Integer> numbersBlocksFilter = reservaSalaService.findReservedBlocksByIdSalaAndDayWeek(idSala, diaSemana);
+    public List<BloqueHorario> filterBlocksByDayWeekAndIdRoom(FilterTimeBlockRequestDTO f){
+
+        List<Integer> numbersBlocksFilter = reservaSalaService.findReservedBlocksByIdSalaAndDayWeek(f.getIdSala(), f.getDiaSemana());
         return filterBlocksByNumbersBlocks(numbersBlocksFilter);
     }
 

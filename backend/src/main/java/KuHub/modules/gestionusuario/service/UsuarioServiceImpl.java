@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -64,6 +65,18 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @Override
+    public String formatearNombreCompleto(Usuario u) {
+        return StringUtils.capitalizarPalabras(Stream.of(
+                        u.getPrimerNombre(),
+                        u.getSegundoNombre(),
+                        u.getApellidoPaterno(),
+                        u.getApellidoMaterno()
+                )
+                .filter(s -> s != null && !s.isBlank())
+                .collect(Collectors.joining(" ")));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<UsuarioResponseDTO> obtenerDocentesYProfesoresActivos() {
         return usuarioRepository.findAll().stream()
@@ -75,6 +88,25 @@ public class UsuarioServiceImpl implements UsuarioService {
                 )
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserIdAndCompleteNameDTO> obtenerTodosProfesorACargo(){
+        List<Usuario> profesoreACargo = usuarioRepository.findAllByRol_IdRol(4);
+
+        List<UserIdAndCompleteNameDTO> profes = new ArrayList<>();
+        for (Usuario pc : profesoreACargo) {
+            if( pc.getActivo()){
+                profes.add (new UserIdAndCompleteNameDTO(
+                        pc.getIdUsuario(),
+                        formatearNombreCompleto(pc)
+                ));
+            }
+
+
+        }
+        return profes;
     }
 
     @Override

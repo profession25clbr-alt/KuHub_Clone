@@ -38,6 +38,12 @@ public class ReservaSalaServiceImp implements ReservaSalaService{
 
     @Transactional(readOnly = true)
     @Override
+    public List<ReservaSala> findAllReserveByIdSeccion(Integer idseccio){
+        return reservaSalaRepository.findBySeccion_IdSeccion(idseccio);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public List<Integer> findReservedBlocksByIdSalaAndDayWeek(Integer idSala, String diaSemana){
         ReservaSala.DiaSemana enumDia = ReservaSala.DiaSemana.valueOf(diaSemana.toUpperCase());
 

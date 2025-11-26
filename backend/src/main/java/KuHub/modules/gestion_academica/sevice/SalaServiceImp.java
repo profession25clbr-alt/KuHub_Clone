@@ -1,7 +1,7 @@
 package KuHub.modules.gestion_academica.sevice;
 
 import KuHub.modules.gestion_academica.entity.Sala;
-import KuHub.modules.gestion_academica.exceptions.SalaException;
+import KuHub.modules.gestion_academica.exceptions.GestionAcademicaException;
 import KuHub.modules.gestion_academica.repository.SalaRepository;
 import KuHub.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +20,7 @@ public class SalaServiceImp implements SalaService {
     @Override
     public Sala findById(Integer id) {
         return salaRepository.findById(id).orElseThrow(
-                () -> new SalaException("La sala con el id: " + id + " no existe")
+                () -> new GestionAcademicaException("La sala con el id: " + id + " no existe")
         );
     }
 
@@ -28,6 +28,12 @@ public class SalaServiceImp implements SalaService {
     @Override
     public List<Sala> findAll() {
         return salaRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<Sala> findAllActiveRoomsTrue (){
+        return salaRepository.findAllByActivoTrue();
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +59,7 @@ public class SalaServiceImp implements SalaService {
 
         // Validación: si codSala no es null -> revisa duplicado
         if (parsearCod != null && salaRepository.existsByCodSala(parsearCod)) {
-            throw new SalaException("Ya existe una sala con el código: " + sala.getCodSala());
+            throw new GestionAcademicaException("Ya existe una sala con el código: " + sala.getCodSala());
         }
 
         // Validación combinada solo si ambas no son null
@@ -61,7 +67,7 @@ public class SalaServiceImp implements SalaService {
                 parsearNombre != null &&
                 salaRepository.existsByNombreSalaAndCodSala(parsearNombre, parsearCod)) {
 
-            throw new SalaException("Ya existe una sala con el nombre: "
+            throw new GestionAcademicaException("Ya existe una sala con el nombre: "
                     + sala.getNombreSala() + " y el código: " + sala.getCodSala());
         }
 

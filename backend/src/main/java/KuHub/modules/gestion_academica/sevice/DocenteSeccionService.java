@@ -8,7 +8,9 @@ import java.util.List;
 public interface DocenteSeccionService {
 
     DocenteSeccionEntityDTO findByIdDocenteSeccion(Integer idDocenteSeccion);
-    DocenteSeccionEntityDTO findByDocenteAndSeccion(Integer idDocente, Integer idSeccion);
+    DocenteSeccionEntityDTO findByDocenteAndSeccionResponseDTO(Integer idDocente, Integer idSeccion);
+    DocenteSeccion findByDocenteAndSeccionEntity(Integer idDocente, Integer idSeccion);
+    DocenteSeccion findByIdSeccionEntity(Integer idSeccion);
     List<DocenteSeccionEntityDTO> findAll ();
     DocenteSeccion save(DocenteSeccion docenteSeccion);
 }

@@ -1,9 +1,10 @@
 package KuHub.modules.gestion_academica.controller;
 
 import KuHub.modules.gestion_academica.dtos.dtoentity.SeccionEntityResponseDTO;
+import KuHub.modules.gestion_academica.dtos.dtomodel.SectionAnswerUpdateDTO;
 import KuHub.modules.gestion_academica.dtos.dtomodel.SectionCreateDTO;
 import KuHub.modules.gestion_academica.entity.Seccion;
-import KuHub.modules.gestion_academica.exceptions.SeccionException;
+import KuHub.modules.gestion_academica.exceptions.GestionAcademicaException;
 import KuHub.modules.gestion_academica.sevice.SeccionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -33,8 +34,17 @@ public class SeccionController {
     ){
         return ResponseEntity
                 .status(200)
-                .body(seccionService.findByIdAndActiveIsTrue(id));
+                .body(seccionService.findByIdAndActiveIsTrueResponseDTO(id));
     }
+
+    /**@GetMapping( "/find-by-section-by-id-seccion/{idSeccion}")
+    public ResponseEntity<SectionAnswerUpdateDTO> findBySectionByIdSeccion (
+            @PathVariable Integer idSeccion
+    ){
+        return ResponseEntity
+                .status(200)
+                .body(seccionService.findBySectionByIdSeccion(idSeccion));
+    }*/
 
     @GetMapping( "/find-all/")
     public ResponseEntity<List<SeccionEntityResponseDTO>> findAll(){
@@ -58,7 +68,7 @@ public class SeccionController {
     }
 
     @PostMapping( "/create-seccion-frontend/")
-    public ResponseEntity<SectionCreateDTO> createSectionFrontend(
+    public ResponseEntity<SectionAnswerUpdateDTO> createSectionFrontend(
             @RequestBody SectionCreateDTO sectionCreateDTO
     ){
         return ResponseEntity
@@ -73,7 +83,7 @@ public class SeccionController {
         try {
             seccionService.softDelete(id);
             return ResponseEntity.noContent().build();
-        }catch (SeccionException e){
+        }catch (GestionAcademicaException e){
             return ResponseEntity.status(400)
                     .body("Error: " + e.getMessage());
         }catch (Exception e){

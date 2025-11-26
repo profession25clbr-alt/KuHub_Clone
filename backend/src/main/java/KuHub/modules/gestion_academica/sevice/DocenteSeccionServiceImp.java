@@ -2,7 +2,7 @@ package KuHub.modules.gestion_academica.sevice;
 
 import KuHub.modules.gestion_academica.dtos.dtoentity.DocenteSeccionEntityDTO;
 import KuHub.modules.gestion_academica.entity.DocenteSeccion;
-import KuHub.modules.gestion_academica.exceptions.DocenteSeccionException;
+import KuHub.modules.gestion_academica.exceptions.GestionAcademicaException;
 import KuHub.modules.gestion_academica.repository.DocenteSeccionRepository;
 import KuHub.modules.gestionusuario.dtos.UsuarioResponseDTO;
 import KuHub.modules.gestionusuario.service.UsuarioService;
@@ -26,21 +26,40 @@ public class DocenteSeccionServiceImp implements DocenteSeccionService{
     @Override
     public DocenteSeccionEntityDTO findByIdDocenteSeccion (Integer idDocenteSeccion){
         DocenteSeccion docenteSeccion = docenteSeccionRepository.findById(idDocenteSeccion)
-                .orElseThrow(() -> new DocenteSeccionException("No existe una DocenteSeccion del id : "+idDocenteSeccion+" registrada")
+                .orElseThrow(() -> new GestionAcademicaException("No existe una DocenteSeccion del id : "+idDocenteSeccion+" registrada")
         );
         return covertsDTO(docenteSeccion);
     }
 
     @Transactional(readOnly = true)
     @Override
-    public DocenteSeccionEntityDTO findByDocenteAndSeccion(Integer idDocente, Integer idSeccion){
+    public DocenteSeccionEntityDTO findByDocenteAndSeccionResponseDTO(Integer idDocente, Integer idSeccion){
         DocenteSeccion docenteSeccion = docenteSeccionRepository.findByUsuario_IdUsuarioAndSeccion_IdSeccion(
                 idDocente, idSeccion
-            ).orElseThrow(() -> new DocenteSeccionException("No existe una DocenteSeccion del id docente : "+idDocente
+            ).orElseThrow(() -> new GestionAcademicaException("No existe una DocenteSeccion del id docente : "+idDocente
                                                             +" y id seccion "+idSeccion+" registrada")
             );
         return covertsDTO(docenteSeccion);
     }
+
+    @Transactional(readOnly = true)
+    @Override
+    public DocenteSeccion findByDocenteAndSeccionEntity(Integer idDocente, Integer idSeccion){
+        return docenteSeccionRepository.findByUsuario_IdUsuarioAndSeccion_IdSeccion(idDocente, idSeccion)
+                .orElseThrow(() -> new GestionAcademicaException("No existe una DocenteSeccion del id docente : "+idDocente
+                                                            +" y id seccion "+idSeccion+" registrada")
+        );
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public DocenteSeccion findByIdSeccionEntity(Integer idSeccion){
+        return docenteSeccionRepository.findBySeccion_IdSeccion(idSeccion)
+                .orElseThrow(() -> new GestionAcademicaException("No existe una DocenteSeccion del id seccion : "+idSeccion+" registrada")
+        );
+    }
+
+
 
     @Transactional(readOnly = true)
     @Override
@@ -51,7 +70,7 @@ public class DocenteSeccionServiceImp implements DocenteSeccionService{
                 .toList();
     }
 
-    //save sin restricciones, debido que se crea en createSection
+    //save sin restricciones, debido que se crea en createSection NO ALTERAR!!!
     @Transactional
     @Override
     public DocenteSeccion save(DocenteSeccion docenteSeccion){

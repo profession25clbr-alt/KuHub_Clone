@@ -1,13 +1,11 @@
 package KuHub.modules.gestion_academica.controller;
 
+import KuHub.modules.gestion_academica.dtos.dtomodel.FilterTimeBlockRequestDTO;
 import KuHub.modules.gestion_academica.entity.BloqueHorario;
 import KuHub.modules.gestion_academica.sevice.BloqueHorarioService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -44,13 +42,12 @@ public class BloqueHorarioController {
                 .body(bloqueHorarioService.filterBlocksByNumbersBlocks(numbersBlocksFilter));
     }
 
-    @GetMapping( "/filter-by-day-week-and-id-room/{idSala}/{diaSemana}")
+    @PostMapping( "/filter-by-day-week-and-id-room/")
     public ResponseEntity<List<BloqueHorario>> filterBlocksDayWeekAndIdRoom(
-            @PathVariable Integer idSala,
-            @PathVariable String diaSemana
-    ){
+            @RequestBody FilterTimeBlockRequestDTO filterTimeBlockRequestDTO
+            ){
         return ResponseEntity
                 .status(200)
-                .body(bloqueHorarioService.filterBlocksByDayWeekAndIdRoom(idSala, diaSemana));
+                .body(bloqueHorarioService.filterBlocksByDayWeekAndIdRoom(filterTimeBlockRequestDTO));
     }
 }

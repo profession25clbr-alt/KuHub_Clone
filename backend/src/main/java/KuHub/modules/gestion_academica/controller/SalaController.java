@@ -1,7 +1,7 @@
 package KuHub.modules.gestion_academica.controller;
 
 import KuHub.modules.gestion_academica.entity.Sala;
-import KuHub.modules.gestion_academica.exceptions.SalaException;
+import KuHub.modules.gestion_academica.exceptions.GestionAcademicaException;
 import KuHub.modules.gestion_academica.sevice.SalaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -25,11 +25,18 @@ public class SalaController {
                 .body(salaService.findById(id));
     }
 
-    @GetMapping( "/find-all")
+    @GetMapping( "/find-all/")
     public ResponseEntity<List<Sala>> findAll(){
         return ResponseEntity
                 .status(200)
                 .body(salaService.findAll());
+    }
+
+    @GetMapping( "/find-all-active-rooms-true/")
+    public ResponseEntity<List<Sala>> findAllActiveRoomsTrue (){
+        return ResponseEntity
+                .status(200)
+                .body(salaService.findAllActiveRoomsTrue());
     }
 
     @PostMapping("/create-sala/")
@@ -49,7 +56,7 @@ public class SalaController {
             salaService.softDelete(id);
             return ResponseEntity.noContent().build();
 
-        } catch (SalaException e) {
+        } catch (GestionAcademicaException e) {
             return ResponseEntity.status(400)
                     .body("Error: " + e.getMessage());
 

@@ -27,10 +27,19 @@ public interface UsuarioService {
     String obtenerNombreCompleto(UsuarioResponseDTO dto);
 
     /**
+     * Formatea el nombre completo del usuario
+     * */
+    String formatearNombreCompleto(Usuario u);
+
+    /**
      * Obtiene docentes ACTIVOS por el nombre de rol
      */
     List<UsuarioResponseDTO> obtenerDocentesYProfesoresActivos();
 
+    /**
+     * Obtiene todos los profesores a cargo
+     * */
+    List<UserIdAndCompleteNameDTO> obtenerTodosProfesorACargo();
     /**
      * Obtiene un usuario por su ID
      */

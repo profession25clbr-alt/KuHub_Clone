@@ -41,5 +41,7 @@ public interface ReservaSalaRepository extends JpaRepository<ReservaSala, Intege
             @Param("diaSemana") String diaSemana
     );
 
+    List<ReservaSala> findBySeccion_IdSeccion(Integer idSeccion);
+
 
 }

@@ -1,7 +1,10 @@
 package KuHub.modules.gestion_academica.controller;
 
+import KuHub.modules.gestion_academica.dtos.dtomodel.CourseCreateDTO;
+import KuHub.modules.gestion_academica.dtos.dtomodel.CourseUpdateDTO;
+import KuHub.modules.gestion_academica.dtos.dtomodel.CourserAnswerDTGOD;
 import KuHub.modules.gestion_academica.entity.Asignatura;
-import KuHub.modules.gestion_academica.exceptions.AsignaturaException;
+import KuHub.modules.gestion_academica.exceptions.GestionAcademicaException;
 import KuHub.modules.gestion_academica.sevice.AsignaturaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +35,13 @@ public class AsignaturaController {
                 .body(asignaturaService.findAll());
     }
 
+    @GetMapping( "/find-all-courses-active-true/")
+    public ResponseEntity<List<CourserAnswerDTGOD>> findAllCourserActiveTrueWithSeccion(){
+        return ResponseEntity
+                .status(200)
+                .body(asignaturaService.findAllCourserActiveTrueWithSeccion());
+    }
+
     @PostMapping("/create-asignatura/")
     public ResponseEntity<Asignatura> save(@RequestBody Asignatura asignatura){
         return ResponseEntity
@@ -39,14 +49,32 @@ public class AsignaturaController {
                 .body(asignaturaService.save(asignatura));
     }
 
-    @PutMapping("/soft-delete/{id}")
-    public ResponseEntity<?> softDelete(
+    @PostMapping( "/create-course/")
+    public ResponseEntity<CourseCreateDTO> createCourse(
+            @RequestBody CourseCreateDTO courseCreateDTO
+    ){
+        return ResponseEntity
+                .status(200)
+                .body(asignaturaService.createCourse(courseCreateDTO));
+    }
+
+    @PutMapping( "/update-course/")
+    public ResponseEntity<CourseUpdateDTO> updateCourser(
+            @RequestBody CourseUpdateDTO courseUpdateDTO
+    ){
+        return ResponseEntity
+                .status(200)
+                .body(asignaturaService.updateCourser(courseUpdateDTO));
+    }
+
+    @PutMapping( "/soft-delete-course/{id}")
+    public ResponseEntity<?> softDeleteCourse(
             @PathVariable Integer id
     ){
         try {
-            asignaturaService.softDelete(id);
+            asignaturaService.softDeleteCourse(id);
             return ResponseEntity.noContent().build();
-        }catch (AsignaturaException e){
+        }catch (GestionAcademicaException e){
             return ResponseEntity.status(400)
                     .body("Error: " + e.getMessage());
         }catch (Exception e){
