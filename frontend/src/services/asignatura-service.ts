@@ -36,7 +36,7 @@ interface SectionAnswerUpdateDTO {
   nombreSeccion: string;
   estadoSeccion: EstadoSeccion;
   idDocente: number;
-  NombreCompletoDocente: string;
+  nombreCompletoDocente: string;
   capacidadMaxInscritos: number;
   cantInscritos: number;
   bloquesHorarios: BookTImeBlocksRequestDTO[]
@@ -79,11 +79,11 @@ interface CourseUpdateDTO {
  */
 const transformarBloqueHorario = (bloque: BookTImeBlocksRequestDTO): IBloqueHorario => {
   return {
-    numeroBloque: bloque.numeroBloque || 0,
+    numeroBloque: typeof bloque.numeroBloque === 'string' ? parseInt(bloque.numeroBloque) : (bloque.numeroBloque || 0),
     horaInicio: bloque.horaInicio || '00:00',
     horaFin: bloque.horaFin || '00:00',
     diaSemana: bloque.diaSemana || 'LUNES',
-    idSala: bloque.idSala || 0,
+    idSala: typeof bloque.idSala === 'string' ? parseInt(bloque.idSala) : (bloque.idSala || 0),
     codSala: bloque.codSala || 'SIN-COD',
     nombreSala: bloque.nombreSala || 'Sin sala'
   };
@@ -96,7 +96,7 @@ const transformarSeccion = (seccion: SectionAnswerUpdateDTO): ISeccion => {
   return {
     id: seccion.idSeccion?.toString() || '0',
     numeroSeccion: seccion.nombreSeccion || 'Sin nombre',
-    profesorAsignado: seccion.NombreCompletoDocente || 'Sin asignar',
+    profesorAsignado: seccion.nombreCompletoDocente || 'Sin asignar',
     profesorAsignadoId: seccion.idDocente?.toString() || '0',
     capacidadMax: seccion.capacidadMaxInscritos || 0,
     cantInscritos: seccion.cantInscritos || 0,
@@ -132,10 +132,10 @@ const transformarAsignatura = (asignatura: CourserAnswerDTGOD): IAsignatura => {
 export const obtenerAsignaturasService = async (): Promise<IAsignatura[]> => {
   try {
     const response = await api.get<CourserAnswerDTGOD[]>(
-        '/asignatura/find-all-courses-active-true/'
+      '/asignatura/find-all-courses-active-true/'
     );
 
-    console.log('📦 Respuesta del backend:', response.data);
+
 
     if (!response.data || !Array.isArray(response.data)) {
       console.error('❌ Respuesta inválida del backend:', response.data);
@@ -151,13 +151,45 @@ export const obtenerAsignaturasService = async (): Promise<IAsignatura[]> => {
       }
     });
 
-    console.log('✅ Asignaturas transformadas:', asignaturas);
+
     return asignaturas;
 
   } catch (error: any) {
     console.error('❌ Error completo:', error);
     console.error('❌ Respuesta del servidor:', error.response?.data);
     throw new Error(error.response?.data?.message || 'Error al obtener las asignaturas');
+  }
+};
+
+/**
+ * Obtener TODAS las asignaturas (incluso no activas) para filtros
+ * Endpoint: /asignatura/find-all/
+ */
+export const obtenerTodasAsignaturasSimplesService = async (): Promise<IAsignatura[]> => {
+  try {
+    const response = await api.get<CourserAnswerDTGOD[]>('/asignatura/find-all/');
+
+    if (!response.data || !Array.isArray(response.data)) {
+      console.error('❌ Respuesta inválida del backend:', response.data);
+      return [];
+    }
+
+    // Reuse the existing transformer
+    const asignaturas = response.data.map((asignatura) => {
+      // We might need a safer transform if the DTO is different, but user implies it's "all subjects"
+      // Trying standard transform first.
+      try {
+        return transformarAsignatura(asignatura);
+      } catch (e) {
+        console.warn("Skipping invalid subject", asignatura);
+        return null;
+      }
+    }).filter((a): a is IAsignatura => a !== null);
+
+    return asignaturas;
+  } catch (error: any) {
+    console.error('Error al obtener todas las asignaturas:', error);
+    return [];
   }
 };
 
@@ -188,14 +220,14 @@ export const crearAsignaturaService = async (data: IAsignaturaCreacion): Promise
     };
 
     const response = await api.post<CourseCreateDTO>(
-        '/asignatura/create-course/',
-        payload
+      '/asignatura/create-course/',
+      payload
     );
 
     // Recargar la lista completa para obtener el objeto completo
     const asignaturas = await obtenerAsignaturasService();
     const nuevaAsignatura = asignaturas.find(
-        a => a.codigo === response.data.codAsignatura
+      a => a.codigo === response.data.codAsignatura
     );
 
     if (!nuevaAsignatura) {
@@ -213,8 +245,8 @@ export const crearAsignaturaService = async (data: IAsignaturaCreacion): Promise
  * Actualizar asignatura
  */
 export const actualizarAsignaturaService = async (
-    id: string,
-    data: Partial<IAsignatura>
+  id: string,
+  data: Partial<IAsignatura>
 ): Promise<IAsignatura> => {
   try {
     const payload: CourseUpdateDTO = {
@@ -227,8 +259,8 @@ export const actualizarAsignaturaService = async (
     };
 
     await api.put<CourseUpdateDTO>(
-        '/asignatura/update-course/',
-        payload
+      '/asignatura/update-course/',
+      payload
     );
 
     // Recargar la asignatura actualizada
@@ -264,8 +296,8 @@ export const eliminarAsignaturaService = async (id: string): Promise<void> => {
  * Agregar sección a una asignatura
  */
 export const agregarSeccionService = async (
-    asignaturaId: string,
-    seccion: Omit<ISeccionCreacion, 'idAsignatura'>
+  asignaturaId: string,
+  seccion: Omit<ISeccionCreacion, 'idAsignatura'>
 ): Promise<IAsignatura> => {
   try {
     const payload = {
@@ -298,25 +330,36 @@ export const agregarSeccionService = async (
  * Actualizar sección completa (incluye bloques horarios)
  */
 export const actualizarSeccionService = async (
-    asignaturaId: string,
-    seccionId: string,
-    seccion: SectionAnswerUpdateDTO
+  asignaturaId: string,
+  seccionId: string,
+  seccion: SectionAnswerUpdateDTO
 ): Promise<IAsignatura> => {
   try {
+    const bloquesSanitizados = seccion.bloquesHorarios?.map(b => ({
+      numeroBloque: typeof b.numeroBloque === 'string' ? parseInt(b.numeroBloque) : b.numeroBloque,
+      horaInicio: (b.horaInicio && b.horaInicio.length === 5) ? `${b.horaInicio}:00` : (b.horaInicio || '00:00:00'),
+      horaFin: (b.horaFin && b.horaFin.length === 5) ? `${b.horaFin}:00` : (b.horaFin || '00:00:00'),
+      diaSemana: b.diaSemana || 'LUNES',
+      idSala: typeof b.idSala === 'string' ? parseInt(b.idSala) : (b.idSala || 0),
+      codSala: b.codSala || '',
+      nombreSala: b.nombreSala || ''
+    })).filter(b => b.idSala > 0 && b.numeroBloque > 0) || [];
+
     const payload: SectionAnswerUpdateDTO = {
       idSeccion: parseInt(seccionId),
       idAsignatura: parseInt(asignaturaId),
       nombreSeccion: seccion.nombreSeccion,
       estadoSeccion: seccion.estadoSeccion,
       idDocente: seccion.idDocente,
-      NombreCompletoDocente: seccion.NombreCompletoDocente || '',
+      nombreCompletoDocente: seccion.nombreCompletoDocente || '',
       capacidadMaxInscritos: seccion.capacidadMaxInscritos,
       cantInscritos: seccion.cantInscritos,
-      bloquesHorarios: seccion.bloquesHorarios,
+      bloquesHorarios: bloquesSanitizados,
       crearSala: seccion.crearSala || false
     };
 
-    await api.put('/seccion/update-seccion/', payload);
+    const response = await api.put('/seccion/update-seccion-frontend/', payload);
+    console.log('🔄 Update Response (Bloques):', response.data);
 
     // Recargar la asignatura completa
     const asignaturaActualizada = await obtenerAsignaturaPorIdService(asignaturaId);
@@ -335,8 +378,8 @@ export const actualizarSeccionService = async (
  * Eliminar sección (soft delete)
  */
 export const eliminarSeccionService = async (
-    asignaturaId: string,
-    seccionId: string
+  asignaturaId: string,
+  seccionId: string
 ): Promise<IAsignatura> => {
   try {
     await api.put(`/seccion/soft-delete/${seccionId}`);
@@ -363,10 +406,39 @@ export const calcularTotalAlumnosService = async (asignaturaId: string): Promise
     if (!asignatura) return 0;
 
     return asignatura.secciones
-        .filter(s => s.estado === 'ACTIVA')
-        .reduce((sum, s) => sum + s.cantInscritos, 0);
+      .filter(s => s.estado === 'ACTIVA')
+      .reduce((sum, s) => sum + s.cantInscritos, 0);
   } catch (error) {
     console.error('Error al calcular total de alumnos:', error);
     return 0;
+  }
+};
+
+/**
+ * Filtra bloques ocupados por sala y día
+ */
+export const filtrarBloquesPorSalaYDiaService = async (
+  diaSemana: DiaSemana,
+  idSala: number
+): Promise<IBloqueHorario[]> => {
+  try {
+    const payload = {
+      diaSemana,
+      idSala
+    };
+
+
+    const response = await api.post<BookTImeBlocksRequestDTO[]>(
+      '/bloque-horario/filter-by-day-week-and-id-room/',
+      payload
+    );
+
+
+
+    if (!response.data) return [];
+    return response.data.map(transformarBloqueHorario);
+  } catch (error: any) {
+    console.error('Error al filtrar bloques:', error);
+    return [];
   }
 };

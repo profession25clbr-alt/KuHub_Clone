@@ -2,12 +2,13 @@
  * TIPOS DEL SISTEMA DE USUARIOS Y ROLES
  */
 
-export type RolUsuario = 
+export type RolUsuario =
   | 'Administrador'
   | 'Co-Administrador'
   | 'Gestor de Pedidos'
   | 'Profesor'
   | 'Profesor a Cargo'
+  | 'Docente'
   | 'Encargado de Bodega'
   | 'Asistente de Bodega';
 
@@ -117,6 +118,18 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, IPermisosRol> = {
     bodegaPrincipal: false,
     bodegaTransito: false,
     crearSolicitudes: true,
+    aprobarSolicitudes: false,
+    gestionarProcesoPedidos: false,
+  },
+  'Docente': {
+    dashboard: false,
+    gestionUsuarios: false,
+    gestionSolicitudes: false,
+    gestionRecetas: true,
+    inventario: false,
+    bodegaPrincipal: false,
+    bodegaTransito: false,
+    crearSolicitudes: false,
     aprobarSolicitudes: false,
     gestionarProcesoPedidos: false,
   },

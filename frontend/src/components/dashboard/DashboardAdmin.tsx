@@ -28,6 +28,8 @@ import {
   obtenerProveedoresConPreciosService,
   IProveedor
 } from '../../services/proveedor-service';
+import { obtenerTodasAsignaturasSimplesService } from '../../services/asignatura-service';
+import { IAsignatura } from '../../types/asignatura.types';
 import { obtenerProductos } from '../../services/storage-service';
 import { DashboardHeader } from './shared/DashboardHeader';
 import { StatsCard } from './shared/StatsCard';
@@ -91,12 +93,7 @@ interface AsignaturaConSolicitud {
   totalSecciones: number;
 }
 
-const ASIGNATURAS_BASE = [
-  { id: '1', codigo: 'GAS-101', nombre: 'Panadería Básica', profesorCoordinador: 'Juan Pérez García', totalSecciones: 3 },
-  { id: '2', codigo: 'GAS-102', nombre: 'Pastelería Avanzada', profesorCoordinador: 'María González López', totalSecciones: 3 },
-  { id: '3', codigo: 'GAS-201', nombre: 'Cocina Internacional', profesorCoordinador: 'Pedro Sánchez Ruiz', totalSecciones: 2 },
-  { id: '4', codigo: 'GAS-202', nombre: 'Cocina Chilena', profesorCoordinador: 'Ana Rodríguez Silva', totalSecciones: 2 }
-];
+
 
 export const DashboardAdmin: React.FC = () => {
   const { user } = useAuth();
@@ -108,6 +105,7 @@ export const DashboardAdmin: React.FC = () => {
   const [solicitudes, setSolicitudes] = useState<ISolicitud[]>([]);
   const [productos, setProductos] = useState<IProducto[]>([]);
   const [productosBajoStock, setProductosBajoStock] = useState<IProducto[]>([]);
+  const [asignaturas, setAsignaturas] = useState<IAsignatura[]>([]);
   // Estados del proceso
   const [estadoProceso, setEstadoProceso] = useState(obtenerEstadoProceso());
   const [semanaSeleccionada, setSemanaSeleccionada] = useState<number | null>(estadoProceso.semanaSeleccionada);
@@ -154,6 +152,9 @@ export const DashboardAdmin: React.FC = () => {
       setSolicitudes(data.solicitudes);
       setProductos(data.productos);
       setProductosBajoStock(data.productosBajoStock);
+
+      const asignaturasData = await obtenerTodasAsignaturasSimplesService();
+      setAsignaturas(asignaturasData);
 
       // Mapear asignaturas con solicitudes
       logger.log('✅ Datos del dashboard cargados');
@@ -635,10 +636,23 @@ export const DashboardAdmin: React.FC = () => {
     ? solicitudes.filter(s => s.semana === estadoProceso.semanaSeleccionada)
     : solicitudes;
 
-  const asignaturasParaMostrar: AsignaturaConSolicitud[] = ASIGNATURAS_BASE.map(asignatura => {
-    const solicitud = solicitudesSemana.find(s => s.asignaturaId === asignatura.id) || null;
-    return { ...asignatura, solicitud };
-  });
+  const asignaturasParaMostrar = React.useMemo(() => {
+    return asignaturas.map(asignatura => {
+      // Find request for this subject in the filtered week list
+      // Note: `solicitudes` objects contain `asignaturaId`.
+      // IAsignatura has `id` as string.
+      const solicitud = solicitudesSemana.find(s => String(s.asignaturaId) === String(asignatura.id)) || null;
+
+      return {
+        id: asignatura.id,
+        codigo: asignatura.codigo,
+        nombre: asignatura.nombre,
+        profesorCoordinador: asignatura.profesorACargoNombre || 'Sin asignar',
+        totalSecciones: asignatura.secciones ? asignatura.secciones.length : 0,
+        solicitud
+      };
+    }).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [asignaturas, solicitudesSemana]);
 
   const conteoSemana = {
     pendientes: solicitudesSemana.filter(s => s.estado === 'Pendiente').length,
@@ -653,7 +667,7 @@ export const DashboardAdmin: React.FC = () => {
     { name: 'Rechazadas', value: conteoSemana.rechazadas, color: COLORS_PIE[2] },
     {
       name: 'Sin solicitud',
-      value: ASIGNATURAS_BASE.length - conteoSemana.total,
+      value: asignaturas.length - conteoSemana.total,
       color: COLORS_PIE[3]
     }
   ].filter(item => item.value > 0);

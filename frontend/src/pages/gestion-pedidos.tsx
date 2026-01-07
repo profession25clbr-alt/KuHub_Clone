@@ -23,11 +23,13 @@ import {
   Selection,
   Divider,
 } from '@heroui/react';
+import { useHistory } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { motion } from 'framer-motion';
 import { useToast } from '../hooks/useToast';
 import { obtenerPedidosService } from '../services/pedido-service';
 import { obtenerTodasSolicitudesService } from '../services/solicitud-service';
+import { obtenerTodasAsignaturasSimplesService } from '../services/asignatura-service';
 import { IPedido, IPedidoResumen, EstadoPedido } from '../types/pedido.types';
 import { ISolicitud, EstadoSolicitud } from '../types/solicitud.types';
 import { EstadoSolicitudChip } from '../components/dashboard/shared/EstadoSolicitudChip';
@@ -38,6 +40,11 @@ type PedidoConSolicitudes = IPedidoResumen & {
 };
 
 const SEMANAS = Array.from({ length: 18 }, (_, index) => index + 1);
+
+const OPCIONES_SEMANA = [
+  { key: 'todas', label: 'Todas' },
+  ...SEMANAS.map((semana) => ({ key: semana.toString(), label: `Semana ${semana}` })),
+];
 
 const construirResumenPedido = (
   pedido: IPedido,
@@ -88,10 +95,14 @@ const renderEstadoPedido = (estado: EstadoPedido) => {
 
 const GestionPedidosPage: React.FC = () => {
   const toast = useToast();
+  const history = useHistory();
   const [pedidos, setPedidos] = React.useState<PedidoConSolicitudes[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [filtroEstado, setFiltroEstado] = React.useState<Selection>(new Set([]));
   const [filtroSemana, setFiltroSemana] = React.useState<Selection>(new Set([]));
+
+  const [filtroAsignatura, setFiltroAsignatura] = React.useState<Selection>(new Set([]));
+  const [listaAsignaturas, setListaAsignaturas] = React.useState<string[]>([]);
   const [busqueda, setBusqueda] = React.useState('');
 
   const [pedidoSeleccionado, setPedidoSeleccionado] = React.useState<PedidoConSolicitudes | null>(null);
@@ -104,7 +115,10 @@ const GestionPedidosPage: React.FC = () => {
   const cargarPedidos = React.useCallback(async () => {
     try {
       setIsLoading(true);
-      const pedidosBase = await obtenerPedidosService();
+      const [pedidosBase, asignaturas] = await Promise.all([
+        obtenerPedidosService(),
+        obtenerTodasAsignaturasSimplesService()
+      ]);
 
       const pedidosConSolicitudes = await Promise.all(
         pedidosBase.map(async (pedido) => {
@@ -114,6 +128,11 @@ const GestionPedidosPage: React.FC = () => {
       );
 
       setPedidos(pedidosConSolicitudes);
+
+      const nombresAsignaturas = asignaturas
+        .map(a => a.nombre)
+        .sort((a, b) => a.localeCompare(b));
+      setListaAsignaturas(nombresAsignaturas);
     } catch (error) {
       logger.error('❌ Error al cargar los pedidos semanales:', error);
       toast.error('Error al cargar los pedidos semanales');
@@ -138,36 +157,61 @@ const GestionPedidosPage: React.FC = () => {
     return valor && valor !== 'todas' ? parseInt(valor, 10) : 0;
   }, [filtroSemana]);
 
+  const asignaturaSeleccionada = React.useMemo(() => {
+    if (filtroAsignatura === 'all') return '';
+    const valor = Array.from(filtroAsignatura)[0] as string | undefined;
+    return valor && valor !== 'todas' ? valor : '';
+  }, [filtroAsignatura]);
+
+
+
   const pedidosFiltrados = React.useMemo(() => {
-    return pedidos.filter((pedido) => {
-      if (estadoSeleccionado && pedido.estado !== estadoSeleccionado) {
-        return false;
-      }
-
-      if (semanaSeleccionada && pedido.semana !== semanaSeleccionada) {
-        return false;
-      }
-
-      if (busqueda) {
-        const texto = busqueda.toLowerCase();
-        const coincidePedido =
-          (pedido.creadoPorNombre || '').toLowerCase().includes(texto) ||
-          (pedido.comentario || '').toLowerCase().includes(texto) ||
-          pedido.id.toLowerCase().includes(texto);
-
-        const coincideSolicitud = pedido.solicitudes.some((solicitud) =>
-          solicitud.asignaturaNombre.toLowerCase().includes(texto) ||
-          solicitud.profesorNombre.toLowerCase().includes(texto)
-        );
-
-        if (!coincidePedido && !coincideSolicitud) {
+    return pedidos
+      .map(pedido => {
+        // 1. First, handle the Asignatura filter "Deeply"
+        // If an asignatura is selected, we only want to count requests from THAT asignatura
+        if (asignaturaSeleccionada) {
+          const solicitudesFiltradas = pedido.solicitudes.filter(s => s.asignaturaNombre === asignaturaSeleccionada);
+          // We must recalculate the stats for this specific slice
+          return construirResumenPedido(pedido, solicitudesFiltradas);
+        }
+        return pedido;
+      })
+      .filter((pedido) => {
+        // 2. Hide rows that have 0 requests after the asignatura filter 
+        // (Unless the user wants to see "Week X: 0 requests", usually usually filtering implies "show matches")
+        if (asignaturaSeleccionada && pedido.totalSolicitudes === 0) {
           return false;
         }
-      }
 
-      return true;
-    });
-  }, [pedidos, estadoSeleccionado, semanaSeleccionada, busqueda]);
+        if (estadoSeleccionado && pedido.estado !== estadoSeleccionado) {
+          return false;
+        }
+
+        if (semanaSeleccionada && pedido.semana !== semanaSeleccionada) {
+          return false;
+        }
+
+        if (busqueda) {
+          const texto = busqueda.toLowerCase();
+          const coincidePedido =
+            (pedido.creadoPorNombre || '').toLowerCase().includes(texto) ||
+            (pedido.comentario || '').toLowerCase().includes(texto) ||
+            pedido.id.toLowerCase().includes(texto);
+
+          const coincideSolicitud = pedido.solicitudes.some((solicitud) =>
+            solicitud.asignaturaNombre.toLowerCase().includes(texto) ||
+            solicitud.profesorNombre.toLowerCase().includes(texto)
+          );
+
+          if (!coincidePedido && !coincideSolicitud) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+  }, [pedidos, estadoSeleccionado, semanaSeleccionada, busqueda, asignaturaSeleccionada]);
 
   const resumenGlobal = React.useMemo(() => {
     const totalSolicitudes = pedidos.reduce((acc, pedido) => acc + pedido.totalSolicitudes, 0);
@@ -275,9 +319,9 @@ const GestionPedidosPage: React.FC = () => {
 
         <Card>
           <CardBody className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_200px_200px] gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Input
-                placeholder="Buscar por profesor, asignatura o comentario..."
+                placeholder="Buscar..."
                 value={busqueda}
                 onValueChange={setBusqueda}
                 startContent={<Icon icon="lucide:search" className="text-default-400" />}
@@ -300,13 +344,24 @@ const GestionPedidosPage: React.FC = () => {
                 placeholder="Todas las semanas"
                 selectedKeys={filtroSemana}
                 onSelectionChange={setFiltroSemana}
+                items={OPCIONES_SEMANA}
               >
-                <SelectItem key="todas">Todas</SelectItem>
-                {SEMANAS.map((semana) => (
-                  <SelectItem key={semana.toString()}>
-                    Semana {semana}
+                {(item) => (
+                  <SelectItem key={item.key}>
+                    {item.label}
                   </SelectItem>
-                ))}
+                )}
+              </Select>
+              <Select
+                label="Asignatura"
+                placeholder="Todas las asignaturas"
+                selectedKeys={filtroAsignatura}
+                onSelectionChange={setFiltroAsignatura}
+                items={[{ key: 'todas', label: 'Todas' }, ...listaAsignaturas.map(a => ({ key: a, label: a }))]}
+              >
+                {(item) => (
+                  <SelectItem key={item.key}>{item.label}</SelectItem>
+                )}
               </Select>
             </div>
           </CardBody>
@@ -381,7 +436,7 @@ const GestionPedidosPage: React.FC = () => {
               <ModalBody className="space-y-4">
                 {pedidoSeleccionado && (
                   <>
-                    <Card variant="flat">
+                    <Card className="border border-default-200">
                       <CardBody className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
                         <div>
                           <p className="text-default-500">Estado</p>
@@ -471,7 +526,7 @@ const GestionPedidosPage: React.FC = () => {
                 <Button
                   color="primary"
                   variant="bordered"
-                  onPress={() => window.open('/gestion-solicitudes', '_blank')}
+                  onPress={() => history.push('/gestion-solicitudes')}
                 >
                   Ir a Gestión de Solicitudes
                 </Button>
@@ -585,7 +640,7 @@ const ResumenCard: React.FC<ResumenCardProps> = ({ titulo, valor, icono, color }
   };
 
   return (
-    <Card variant="flat" className="border border-default-200">
+    <Card className="border border-default-200">
       <CardBody className="flex items-center gap-4">
         <div className={`p-3 rounded-full ${colorClasses[color]}`}>
           <Icon icon={icono} className="text-xl" />

@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
+import {
   Card, CardBody, Button, Input, Select, SelectItem, Chip,
   Table, TableHeader, TableColumn, TableBody, TableRow, TableCell,
-  Textarea, Divider, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure
+  Textarea, Divider, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure, Tooltip
 } from '@heroui/react';
 import { Icon } from '@iconify/react';
 import { motion } from 'framer-motion';
@@ -31,7 +31,7 @@ const SolicitudPage: React.FC = () => {
   const [productos, setProductos] = React.useState<IProducto[]>([]);
   const [asignaturas, setAsignaturas] = React.useState<IAsignatura[]>([]);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
-  
+
   const [asignaturaId, setAsignaturaId] = React.useState<string>('');
   const [semana, setSemana] = React.useState<string>('');
   const [fecha, setFecha] = React.useState<string>('');
@@ -40,9 +40,9 @@ const SolicitudPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
   const [multiplicadorReceta, setMultiplicadorReceta] = React.useState<number>(1);
 
-  const [recetaCargada, setRecetaCargada] = React.useState<{id: string, nombre: string} | null>(null);
+  const [recetaCargada, setRecetaCargada] = React.useState<{ id: string, nombre: string } | null>(null);
   const [esCustom, setEsCustom] = React.useState<boolean>(false);
-  
+
   const [nuevoProductoId, setNuevoProductoId] = React.useState<string>('');
   const [nuevaCantidad, setNuevaCantidad] = React.useState<string>('');
 
@@ -107,13 +107,13 @@ const SolicitudPage: React.FC = () => {
       if (asignatura) {
         // Calcular total de alumnos activos
         const totalAlumnos = asignatura.secciones
-          .filter(s => s.estado === 'Activa')
-          .reduce((sum, s) => sum + s.cantidadAlumnos, 0);
-        
+          .filter(s => s.estado === 'ACTIVA')
+          .reduce((sum, s) => sum + s.cantInscritos, 0);
+
         // Multiplicador: receta base es para 20 personas
         const multiplicador = totalAlumnos > 0 ? totalAlumnos / 20 : 1;
         setMultiplicadorReceta(multiplicador);
-        
+
         // Si hay una receta cargada, recalcular las cantidades
         if (recetaCargada) {
           const recetaSeleccionada = recetasDisponibles.find(r => r.id === recetaCargada.id);
@@ -147,12 +147,12 @@ const SolicitudPage: React.FC = () => {
     // Convertir ingredientes de receta a items de solicitud
     // Multiplicar por el multiplicador actual (basado en alumnos de la asignatura)
     const nuevosItems: IItemSolicitud[] = recetaSeleccionada.ingredientes.map(ing => ({
-        id: `${recetaId}-${ing.id}-${Date.now()}`,
-        productoId: ing.productoId,
-        productoNombre: ing.productoNombre,
-        cantidad: ing.cantidad * multiplicadorReceta,
-        unidadMedida: ing.unidadMedida,
-        esAdicional: false // Viene de la receta
+      id: `${recetaId}-${ing.id}-${Date.now()}`,
+      productoId: ing.productoId,
+      productoNombre: ing.productoNombre,
+      cantidad: ing.cantidad * multiplicadorReceta,
+      unidadMedida: ing.unidadMedida,
+      esAdicional: false // Viene de la receta
     }));
 
     setItems(nuevosItems);
@@ -163,7 +163,7 @@ const SolicitudPage: React.FC = () => {
       toast.warning('Por favor, seleccione un producto y especifique una cantidad válida');
       return;
     }
-    
+
     const producto = productos.find(p => p.id === nuevoProductoId);
     if (!producto) return;
 
@@ -185,7 +185,7 @@ const SolicitudPage: React.FC = () => {
   const eliminarItem = (id: string) => {
     const nuevoItems = items.filter(item => item.id !== id);
     setItems(nuevoItems);
-    
+
     // Si eliminamos todos los items de la receta, marcar como custom
     if (recetaCargada) {
       const itemsDeReceta = nuevoItems.filter(item => !item.esAdicional);
@@ -215,6 +215,46 @@ const SolicitudPage: React.FC = () => {
     onDetalleOpen();
   };
 
+  const isFechaVencida = (fechaStr: string) => {
+    const fechaSolicitud = new Date(fechaStr);
+    const hoy = new Date();
+    // Reset hours to compare only dates
+    fechaSolicitud.setHours(0, 0, 0, 0);
+    hoy.setHours(0, 0, 0, 0);
+    return fechaSolicitud <= hoy;
+  };
+
+  const handleCargarSolicitud = (solicitud: ISolicitud) => {
+    // 1. Set basic fields
+    setAsignaturaId(solicitud.asignaturaId);
+    setSemana(solicitud.semana.toString());
+    setFecha(solicitud.fecha.split('T')[0]); // Ensure YYYY-MM-DD
+    setObservaciones(solicitud.observaciones || '');
+
+    // 2. Set Receta if present
+    if (solicitud.recetaId && solicitud.recetaNombre) {
+      setRecetaCargada({ id: solicitud.recetaId, nombre: solicitud.recetaNombre });
+    } else {
+      setRecetaCargada(null);
+    }
+
+    // 3. Set Items (and regenerate IDs to avoid conflicts if needed, though usually fine)
+    const nuevosItems = solicitud.items.map(item => ({
+      ...item,
+      id: Date.now() + Math.random().toString(36).substr(2, 9) // New IDs for the new draft
+    }));
+    setItems(nuevosItems);
+
+    // 4. Set Custom flag
+    setEsCustom(solicitud.esCustom);
+
+    // 5. Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // 6. Notify user
+    toast.info('Solicitud cargada en el formulario. Puede editarla y enviarla nuevamente.');
+  };
+
   const enviarSolicitud = async () => {
     if (!asignaturaId || !fecha || !semana || items.length === 0) {
       toast.warning('Por favor, complete todos los campos obligatorios, seleccione la semana y agregue al menos un producto');
@@ -225,12 +265,12 @@ const SolicitudPage: React.FC = () => {
       toast.warning('La semana seleccionada no es válida');
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
-      
+
       const asignaturaNombre = asignaturas.find(a => a.id === asignaturaId)?.nombre || '';
-      
+
       await crearSolicitudService({
         asignaturaId,
         asignaturaNombre,
@@ -248,7 +288,7 @@ const SolicitudPage: React.FC = () => {
         observaciones,
         esCustom
       });
-      
+
       // Limpiar formulario
       setAsignaturaId('');
       setSemana('');
@@ -257,7 +297,7 @@ const SolicitudPage: React.FC = () => {
       setItems([]);
       setRecetaCargada(null);
       setEsCustom(false);
-      
+
       await cargarHistorial();
 
       toast.success('Solicitud enviada correctamente');
@@ -299,8 +339,8 @@ const SolicitudPage: React.FC = () => {
           <CardBody className="p-6">
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Select 
-                  label="Asignatura" 
+                <Select
+                  label="Asignatura"
                   placeholder="Seleccione una asignatura"
                   selectedKeys={asignaturaSelectedKeys}
                   onSelectionChange={(keys) => {
@@ -315,7 +355,7 @@ const SolicitudPage: React.FC = () => {
                     </SelectItem>
                   ))}
                 </Select>
-                
+
                 <Input
                   type="date"
                   label="Fecha de Clase"
@@ -345,22 +385,22 @@ const SolicitudPage: React.FC = () => {
                   })}
                 </Select>
               </div>
-              
+
               <Divider />
-              
+
               <div>
                 <h3 className="text-lg font-semibold mb-4">Cargar Receta Base</h3>
                 {asignaturaId && multiplicadorReceta > 0 && (
                   <div className="mb-3 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-200 dark:border-primary-800">
                     <p className="text-sm text-primary-700 dark:text-primary-300">
                       <Icon icon="lucide:info" className="inline mr-1" />
-                      <strong>Multiplicador activo:</strong> {multiplicadorReceta.toFixed(2)}x 
-                      (Receta base: 20 personas | Total alumnos activos: {asignaturas.find(a => a.id === asignaturaId)?.secciones.filter(s => s.estado === 'Activa').reduce((sum, s) => sum + s.cantidadAlumnos, 0) || 0})
+                      <strong>Multiplicador activo:</strong> {multiplicadorReceta.toFixed(2)}x
+                      (Receta base: 20 personas | Total alumnos activos: {asignaturas.find(a => a.id === asignaturaId)?.secciones.filter(s => s.estado === 'ACTIVA').reduce((sum, s) => sum + s.cantInscritos, 0) || 0})
                     </p>
                   </div>
                 )}
-                <Select 
-                  label="Receta" 
+                <Select
+                  label="Receta"
                   placeholder="Seleccione una receta para cargar sus ingredientes"
                   onSelectionChange={(keys) => handleSeleccionarReceta(Array.from(keys)[0] as string)}
                   isDisabled={!asignaturaId}
@@ -372,7 +412,7 @@ const SolicitudPage: React.FC = () => {
                     </SelectItem>
                   ))}
                 </Select>
-                
+
                 {recetasDisponibles.length === 0 && (
                   <p className="text-sm text-warning mt-2">
                     No hay recetas activas disponibles. Cree recetas en la sección de Gestión de Recetas.
@@ -386,8 +426,8 @@ const SolicitudPage: React.FC = () => {
                   <div>
                     <h3 className="text-lg font-semibold mb-4">Agregar Productos Adicionales</h3>
                     <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-4 items-end">
-                      <Select 
-                        label="Producto" 
+                      <Select
+                        label="Producto"
                         placeholder="Seleccione un producto"
                         selectedKeys={nuevoProductoSelectedKeys}
                         onSelectionChange={(keys) => {
@@ -421,8 +461,8 @@ const SolicitudPage: React.FC = () => {
                           )
                         }
                       />
-                      <Button 
-                        color="primary" 
+                      <Button
+                        color="primary"
                         variant="flat"
                         onPress={agregarProductoExtra}
                         startContent={<Icon icon="lucide:plus" />}
@@ -434,7 +474,7 @@ const SolicitudPage: React.FC = () => {
                   </div>
                 </>
               )}
-              
+
               <Divider />
 
               <div>
@@ -442,7 +482,7 @@ const SolicitudPage: React.FC = () => {
                   {recetaCargada ? `Ingredientes del Pedido: ${recetaCargada.nombre}` : 'Ingredientes del Pedido'}
                   {esCustom && <span className="text-primary font-normal"> (Personalizado)</span>}
                 </h3>
-                <Table 
+                <Table
                   aria-label="Lista de productos solicitados"
                   removeWrapper
                 >
@@ -465,9 +505,9 @@ const SolicitudPage: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Button 
-                            isIconOnly 
-                            variant="light" 
+                          <Button
+                            isIconOnly
+                            variant="light"
                             size="sm"
                             onPress={() => eliminarItem(item.id)}
                           >
@@ -479,9 +519,9 @@ const SolicitudPage: React.FC = () => {
                   </TableBody>
                 </Table>
               </div>
-              
+
               <Divider />
-              
+
               <div>
                 <Textarea
                   label="Observaciones"
@@ -491,10 +531,10 @@ const SolicitudPage: React.FC = () => {
                   minRows={3}
                 />
               </div>
-              
+
               <div className="flex justify-end gap-2">
-                <Button 
-                  variant="flat" 
+                <Button
+                  variant="flat"
                   onPress={() => {
                     setItems([]);
                     setRecetaCargada(null);
@@ -507,8 +547,8 @@ const SolicitudPage: React.FC = () => {
                 >
                   Cancelar
                 </Button>
-                <Button 
-                  color="primary" 
+                <Button
+                  color="primary"
                   onPress={enviarSolicitud}
                   isLoading={isSubmitting}
                   isDisabled={isSubmitting || items.length === 0 || !asignaturaId || !fecha || !semana}
@@ -526,6 +566,11 @@ const SolicitudPage: React.FC = () => {
               <h2 className="text-xl font-semibold">Historial de solicitudes</h2>
               <p className="text-default-500 text-sm">
                 Revisa el estado de tus solicitudes por semana. Podrás ver si fueron aceptadas, modificadas o rechazadas.
+                <br />
+                <span className="text-primary text-xs font-semibold">
+                  <Icon icon="lucide:info" className="inline mr-1" width={12} />
+                  Tip: Doble clic en una fila para volver a cargar la solicitud en el formulario.
+                </span>
               </p>
             </div>
 
@@ -553,28 +598,53 @@ const SolicitudPage: React.FC = () => {
                   <TableColumn>ACCIONES</TableColumn>
                 </TableHeader>
                 <TableBody>
-                  {historialSolicitudes.map((solicitud) => (
-                    <TableRow key={solicitud.id}>
-                      <TableCell>Semana {solicitud.semana}</TableCell>
-                      <TableCell>{new Date(solicitud.fecha).toLocaleDateString('es-CL')}</TableCell>
-                      <TableCell>{renderEstadoChip(solicitud.estado)}</TableCell>
-                      <TableCell>
-                        {solicitud.estado === 'Rechazada'
-                          ? solicitud.comentarioRechazo || '—'
-                          : solicitud.comentarioAdministrador || '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          isIconOnly
-                          variant="light"
-                          size="sm"
-                          onPress={() => abrirDetalleSolicitud(solicitud)}
-                        >
-                          <Icon icon="lucide:eye" className="text-primary" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {historialSolicitudes.map((solicitud) => {
+                    const isVencida = isFechaVencida(solicitud.fecha);
+
+                    return (
+                      <TableRow
+                        key={solicitud.id}
+                        className={isVencida
+                          ? "opacity-50 grayscale cursor-not-allowed bg-default-100"
+                          : "cursor-pointer hover:bg-default-100 transition-colors"
+                        }
+                        onDoubleClick={() => {
+                          if (isVencida) {
+                            toast.warning('No se puede recargar: La fecha de esta solicitud ya pasó.');
+                            return;
+                          }
+                          handleCargarSolicitud(solicitud);
+                        }}
+                      >
+                        <TableCell>Semana {solicitud.semana}</TableCell>
+                        <TableCell>{new Date(solicitud.fecha).toLocaleDateString('es-CL')}</TableCell>
+                        <TableCell>
+                          {isVencida ? (
+                            <Tooltip content="No se puede recargar: Fecha vencida">
+                              <div className="inline-block">{renderEstadoChip(solicitud.estado)}</div>
+                            </Tooltip>
+                          ) : (
+                            renderEstadoChip(solicitud.estado)
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {solicitud.estado === 'Rechazada'
+                            ? solicitud.comentarioRechazo || '—'
+                            : solicitud.comentarioAdministrador || '—'}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            isIconOnly
+                            variant="light"
+                            size="sm"
+                            onPress={() => abrirDetalleSolicitud(solicitud)}
+                          >
+                            <Icon icon="lucide:eye" className="text-primary" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}

@@ -26,6 +26,7 @@ const BodegaTransitoPage = lazy(() => import('./pages/bodega-transito'));
 const GestionRecetasPage = lazy(() => import('./pages/gestion-recetas'));
 const GestionUsuariosPage = lazy(() => import('./pages/gestion-usuarios'));
 const GestionSolicitudesPage = lazy(() => import('./pages/gestion-solicitudes'));
+const GestionSalasPage = lazy(() => import('./pages/gestion-salas'));
 const NotFoundPage = lazy(() => import('./pages/not-found'));
 
 // Componente de ruta protegida
@@ -192,6 +193,12 @@ const App: React.FC = () => {
                 <ProtectedRoute path="/ramos-admin" pageId="ramos-admin">
                   <MainLayout>
                     <RamosAdminPage />
+                  </MainLayout>
+                </ProtectedRoute>
+
+                <ProtectedRoute path="/gestion-salas" pageId="ramos-admin">
+                  <MainLayout>
+                    <GestionSalasPage />
                   </MainLayout>
                 </ProtectedRoute>
 
