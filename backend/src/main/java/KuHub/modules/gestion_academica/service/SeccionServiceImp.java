@@ -1,4 +1,4 @@
-package KuHub.modules.gestion_academica.sevice;
+package KuHub.modules.gestion_academica.service;
 
 import KuHub.modules.gestion_academica.dtos.dtoentity.SeccionEntityResponseDTO;
 import KuHub.modules.gestion_academica.dtos.dtomodel.BookTImeBlocksRequestDTO;
@@ -88,6 +88,12 @@ public class SeccionServiceImp implements SeccionService{
                 .stream()
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<Seccion> findAllSeccionsSeccionList(List<Integer> seccionesIds){
+        return seccionRepository.findAllById(seccionesIds);
     }
 
     @Transactional

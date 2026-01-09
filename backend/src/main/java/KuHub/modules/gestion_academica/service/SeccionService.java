@@ -1,4 +1,4 @@
-package KuHub.modules.gestion_academica.sevice;
+package KuHub.modules.gestion_academica.service;
 
 import KuHub.modules.gestion_academica.dtos.dtoentity.SeccionEntityResponseDTO;
 import KuHub.modules.gestion_academica.dtos.dtomodel.SectionAnswerUpdateDTO;
@@ -15,6 +15,7 @@ public interface SeccionService {
     //SectionAnswerUpdateDTO findBySectionByIdSeccion(Integer idSeccion);
     List<SeccionEntityResponseDTO> findAll();
     List<SeccionEntityResponseDTO> findAllByActivoTrue();
+    List<Seccion> findAllSeccionsSeccionList(List<Integer> seccionesIds);
     SeccionEntityResponseDTO save(Seccion seccion);
     SectionAnswerUpdateDTO createSection (SectionCreateDTO dto);
     SectionAnswerUpdateDTO updateSection(SectionAnswerUpdateDTO dto);

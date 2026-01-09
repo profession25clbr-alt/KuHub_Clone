@@ -1,4 +1,4 @@
-package KuHub.modules.gestion_academica.sevice;
+package KuHub.modules.gestion_academica.service;
 
 import KuHub.modules.gestion_academica.dtos.dtoentity.ReservaSalaEntityResponseDTO;
 import KuHub.modules.gestion_academica.dtos.projection.NumberBlockProjection;

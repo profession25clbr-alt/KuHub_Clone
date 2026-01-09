@@ -1,4 +1,4 @@
-package KuHub.modules.gestion_academica.sevice;
+package KuHub.modules.gestion_academica.service;
 
 import KuHub.modules.gestion_academica.entity.AsignaturaProfesorCargo;
 import KuHub.modules.gestion_academica.exceptions.GestionAcademicaException;
