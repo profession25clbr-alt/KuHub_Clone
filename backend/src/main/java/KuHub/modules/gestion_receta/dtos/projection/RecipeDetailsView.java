@@ -1,4 +1,4 @@
-package KuHub.modules.gestion_receta.projection;
+package KuHub.modules.gestion_receta.dtos.projection;
 
 public interface RecipeDetailsView {
 

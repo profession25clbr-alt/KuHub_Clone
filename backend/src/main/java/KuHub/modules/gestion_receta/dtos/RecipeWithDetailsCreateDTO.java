@@ -11,13 +11,11 @@ import java.util.List;
 @Getter@Setter@ToString@AllArgsConstructor@NoArgsConstructor
 public class RecipeWithDetailsCreateDTO {
 
-    //private Integer id_receta;
     @NotBlank
     private String nombreReceta;
     private String descripcionReceta;
     @NotEmpty(message = "La lista de items no puede estar vacía")
-    @Valid
-    private List<RecipeItemDTO> listaItems;
+    private List<@Valid RecipeItemCreateDTO> listaItems;
     private String instrucciones;
     private Receta.EstadoRecetaType estadoReceta;
 

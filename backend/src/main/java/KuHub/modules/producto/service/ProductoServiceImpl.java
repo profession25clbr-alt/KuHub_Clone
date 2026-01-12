@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 
 @Service
@@ -47,6 +48,12 @@ public class ProductoServiceImpl implements ProductoService{
         return productoRepository.findByIdProductoAndActivoTrue(id_producto).orElseThrow(
                 ()-> new ProductoNotFoundException(id_producto)
         );
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<Producto> findAllByIdInAndActivoTrue(Collection<Integer> ids){
+        return productoRepository.findAllByIdProductoInAndActivoTrue(ids);
     }
 
     @Transactional(readOnly = true)

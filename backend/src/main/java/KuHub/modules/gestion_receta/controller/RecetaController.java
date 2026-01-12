@@ -1,11 +1,13 @@
 package KuHub.modules.gestion_receta.controller;
 
-import KuHub.modules.gestion_receta.dtos.RecipeWithDetailsAnswerUpdateDTO;
+import KuHub.modules.gestion_receta.dtos.RecipeUpdateDeltaDTO;
+import KuHub.modules.gestion_receta.dtos.RecipeWithDetailsAnswerDTO;
 import KuHub.modules.gestion_receta.dtos.RecipeWithDetailsCreateDTO;
 import KuHub.modules.gestion_receta.entity.Receta;
 import KuHub.modules.gestion_receta.services.RecetaService;
 import jakarta.persistence.EntityExistsException;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -58,7 +60,7 @@ public class RecetaController {
     }
 
     @GetMapping("/find-all-recipe-with-details-active/")
-    public ResponseEntity<List<RecipeWithDetailsAnswerUpdateDTO>> findAllRecipeWithDetailsActive(){
+    public ResponseEntity<List<RecipeWithDetailsAnswerDTO>> findAllRecipeWithDetailsActive(){
         try{
             return ResponseEntity
                     .status(200)
@@ -79,11 +81,13 @@ public class RecetaController {
 
     @PostMapping("/create-recipe-with-details/")
     public ResponseEntity<?> saveRecipeWithDetails(
-            @RequestBody RecipeWithDetailsCreateDTO recipeWithDetailsCreateDTO){
+            @RequestBody @Valid RecipeWithDetailsCreateDTO dto) {
         try {
+            // Ejecuta el servicio y retorna el DTO de respuesta
             return ResponseEntity
                     .status(201)
-                    .body(recetaService.saveRecipeWithDetails(recipeWithDetailsCreateDTO));
+                    .body(recetaService.saveRecipeWithDetails(dto));
+
         } catch (IllegalArgumentException ex) {
             return ResponseEntity
                     .status(404)
@@ -93,6 +97,7 @@ public class RecetaController {
                     .status(409)
                     .body("La receta ya existe o está duplicada. No se puede crear nuevamente.");
         } catch (Exception ex) {
+            // Log para debug interno, pero mantiene el 500 para el cliente
             return ResponseEntity
                     .status(500)
                     .build();
@@ -101,12 +106,12 @@ public class RecetaController {
 
     @PutMapping("/update-recipe-with-details/")
     public ResponseEntity<?> updateRecipe(
-            @RequestBody RecipeWithDetailsAnswerUpdateDTO dtoUpdate
+            @RequestBody RecipeUpdateDeltaDTO dtoUpdate
     ){
         try {
             return ResponseEntity
                     .status(200)
-                    .body(recetaService.updateRecipeWithDetails(dtoUpdate));
+                    .body(recetaService.updateRecipeWithDelta(dtoUpdate));
         } catch (EntityNotFoundException ex) {
             return ResponseEntity.status(404)
                     .body("La receta que intentas actualizar no existe.");
@@ -126,7 +131,7 @@ public class RecetaController {
             @PathVariable("id_receta") Integer idReceta) {
         try {
             recetaService.updateDeleteStatusActiveFalseRecipeWithDetails(idReceta);
-            return ResponseEntity.ok().build();  // 200 OK sin body
+            return ResponseEntity.status(204).build();
 
         } catch (EntityNotFoundException ex) {
             return ResponseEntity.status(404)
@@ -143,7 +148,7 @@ public class RecetaController {
             @PathVariable("id_receta") Integer idReceta) {
         try {
             recetaService.updateChangingStatusRecipeWith(idReceta);
-            return ResponseEntity.status(204).build();
+            return ResponseEntity.status(200).build();
         } catch (EntityNotFoundException ex) {
             return ResponseEntity
                     .status(404)

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 @Getter@Setter@ToString@AllArgsConstructor@NoArgsConstructor
-public class RecipeItemDTO {
+public class RecipeItemAnswerDTO {
     @NotNull
     private Integer idProducto;
     @NotBlank

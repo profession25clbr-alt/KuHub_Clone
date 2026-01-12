@@ -13,21 +13,14 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-public class RecipeWithDetailsAnswerUpdateDTO {
+public class RecipeWithDetailsAnswerDTO {
 
-    @NotNull
     private Integer idReceta;
-    @NotBlank
     private String nombreReceta;
     private String descripcionReceta;
-    @NotEmpty(message = "La lista de items no puede estar vacía")
-    @Valid
-    private List<RecipeItemDTO> listaItems;
+    private List<RecipeItemAnswerDTO> listaItems;
     private String instrucciones;
-    @NotNull(message = "El estado de la receta no puede ser nulo")
     private Receta.EstadoRecetaType estadoReceta;
 
-    private boolean cambioReceta;
-    private boolean cambioDetalles;
 
 }

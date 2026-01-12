@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +33,8 @@ public interface ProductoRepository extends JpaRepository<Producto, Integer> {
     boolean existsBycodProductoAndActivo(String codProducto, Boolean activo);
     boolean existsByIdProducto(Integer idProducto);
 
+    // Cambia "Id" por "IdProducto"
+    List<Producto> findAllByIdProductoInAndActivoTrue(Collection<Integer> ids);;
     //List<Producto> findByCategoriaIdCategoria(Long idCategoria);
     //boolean existsByCategoriaIdCategoria(Long idCategoria);
 }
