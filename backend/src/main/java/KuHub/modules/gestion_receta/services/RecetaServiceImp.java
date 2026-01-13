@@ -67,30 +67,38 @@ public class RecetaServiceImp implements RecetaService{
 
     @Transactional(readOnly = true)
     @Override
-    public RecipeWithDetailsAnswerDTO findRecipeWithDetailsActiveInTrue(
-            Integer id
-    ){
-        Receta receta = findByIdRecetaAndActivoRecetaIsTrue(id);
-        List<DetalleReceta> detalles = detalleRecetaService.findAllByReceta(receta);
-        List<RecipeItemAnswerDTO> items = new ArrayList<>();
-        for (DetalleReceta d : detalles){
-            items.add(new RecipeItemAnswerDTO(
-                    d.getProducto().getIdProducto(),
-                    d.getProducto().getNombreProducto(),
-                    d.getProducto().getUnidadMedida(),
-                    d.getCantProducto(),
-                    d.getProducto().getActivo()
-            ));
-        }
+    public RecipeWithDetailsAnswerDTO findRecipeWithDetailsActiveInTrue(Integer id) {
+        log.info("🔍 Consultando receta ID: {} usando proyecciones", id);
+
+        // 1. Buscamos la cabecera de la receta
+        Receta receta = recetaRepository.findByIdRecetaAndActivoRecetaIsTrue(id)
+                .orElseThrow(() -> new RecetaException("Receta no encontrada o inactiva con ID: " + id));
+
+        // 2. ⚡ AQUÍ ESTÁ EL CAMBIO: Llamamos directamente a tu consulta del Repo
+        // Esto es mucho más eficiente porque la base de datos ya hace el JOIN
+        List<DetalleRecetaItemProjection> itemsProyectados =
+                detalleRecetaService.findItemsByRecetaId(receta.getIdReceta());
+
+        // 3. Transformamos la Proyección al DTO de respuesta
+        List<RecipeItemAnswerDTO> listaItems = itemsProyectados.stream()
+                .map(p -> new RecipeItemAnswerDTO(
+                        p.getIdProducto(),
+                        p.getNombreProducto(),
+                        p.getUnidadMedida(),
+                        p.getCantProducto(),
+                        p.getActivo()
+                ))
+                .collect(Collectors.toList());
+
+        // 4. Retornamos el DTO final
         return new RecipeWithDetailsAnswerDTO(
                 receta.getIdReceta(),
                 receta.getNombreReceta(),
                 receta.getDescripcionReceta(),
-                items,
-                receta.getInstruccionesReceta(),
+                listaItems, // La lista obtenida de la proyección
+                receta.getInstruccionesReceta(), // Se mapea al campo 'instrucciones' del DTO
                 receta.getEstadoReceta()
         );
-
     }
 
     @Transactional(readOnly = true)

@@ -1,6 +1,7 @@
 package KuHub.modules.producto.service;
 
 import KuHub.modules.producto.dtos.ProductoUpdateRequest;
+import KuHub.modules.producto.dtos.proyeccion.ProductRecipeView;
 import KuHub.modules.producto.entity.Producto;
 import KuHub.modules.producto.exceptions.ProductoException;
 import KuHub.modules.producto.exceptions.ProductoExistenteException;
@@ -40,6 +41,12 @@ public class ProductoServiceImpl implements ProductoService{
         return productoRepository.findById(id).orElseThrow(
                 ()-> new ProductoNotFoundException(id)
         );
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<ProductRecipeView> findAllActiveForRecipe(){
+        return productoRepository.findAllActiveForRecipe();
     }
 
     @Transactional(readOnly = true)

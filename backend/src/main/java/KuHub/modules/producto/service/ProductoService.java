@@ -2,6 +2,7 @@ package KuHub.modules.producto.service;
 
 
 import KuHub.modules.producto.dtos.ProductoUpdateRequest;
+import KuHub.modules.producto.dtos.proyeccion.ProductRecipeView;
 import KuHub.modules.producto.entity.Producto;
 
 import java.util.Collection;
@@ -13,6 +14,8 @@ public interface ProductoService {
     List<Producto> findByActivo(Boolean activo);
 
     List<Producto> findAllByIdInAndActivoTrue(Collection<Integer> ids);
+
+    List<ProductRecipeView> findAllActiveForRecipe();
 
     Boolean existProductByName (String nombreProducto);
     Boolean existProductoById (Integer id);

@@ -30,10 +30,19 @@ public class RecetaController {
     }
 
     @GetMapping("/find-by-id-active-recipe-true/{id}")
-        public ResponseEntity<Receta> findByIdRecetaAndActivoRecetaIsTrue(@PathVariable Integer id){
+    public ResponseEntity<Receta> findByIdRecetaAndActivoRecetaIsTrue(@PathVariable Integer id){
         return ResponseEntity
                 .status(200)
                 .body(recetaService.findByIdRecetaAndActivoRecetaIsTrue(id));
+    }
+
+    @GetMapping( "/find-recipe-with-details-active-in-true/{id}")
+    public ResponseEntity<RecipeWithDetailsAnswerDTO> findRecipeWithDetailsActiveInTrue(
+            @PathVariable Integer id
+    )  {
+        return ResponseEntity
+                .status(200)
+                .body(recetaService.findRecipeWithDetailsActiveInTrue(id));
     }
 
     @GetMapping("/find-all/")
