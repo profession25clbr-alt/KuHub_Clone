@@ -270,6 +270,33 @@ public class SpringSecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v*/receta/**").hasRole("ADMINISTRADOR")
 
                         // ========================================
+                        // ENDPOINTS DE SOLICITUDES
+                        // ========================================
+
+                        // 1. Consulta de Disponibilidad (POST): Todos los roles operativos
+                        .requestMatchers("/api/v*/solicitud/check-section-availability")
+                        .hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR", "GESTOR_PEDIDOS", "PROFESOR_A_CARGO")
+
+                        // 2. Creación de Solicitudes (POST): Todos los roles operativos
+                        .requestMatchers("/api/v*/solicitud/save-solicitation")
+                        .hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR", "GESTOR_PEDIDOS", "PROFESOR_A_CARGO")
+
+                                // ========================================
+                        // ENDPOINTS DE SEMANAS (CALENDARIO ACADÉMICO)
+                        // ========================================
+
+                        // Lectura de semanas activas: Todos los roles operativos
+                        .requestMatchers(HttpMethod.POST, "/api/v*/semanas/activas-por-anio").hasAnyRole(
+                        "ADMINISTRADOR", "CO_ADMINISTRADOR", "GESTOR_PEDIDOS", "PROFESOR_A_CARGO")
+
+                        .requestMatchers(HttpMethod.GET, "/api/v*/semanas/**").hasAnyRole(
+                        "ADMINISTRADOR", "CO_ADMINISTRADOR", "GESTOR_PEDIDOS", "PROFESOR_A_CARGO")
+
+                        // Gestión (Crear/Eliminar): Solo niveles administrativos
+                        .requestMatchers(HttpMethod.POST, "/api/v*/semanas").hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v*/semanas/**").hasRole("ADMINISTRADOR")
+
+                        // ========================================
                         // RESTO DE ENDPOINTS
                         // ========================================
                         // Cualquier otra petición requiere autenticación (sin importar el rol)
