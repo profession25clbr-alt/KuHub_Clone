@@ -192,20 +192,21 @@ public class SpringSecurityConfig {
                         // ENDPOINTS DE USUARIOS
                         // ========================================
 
-                        // Permite que cualquier usuario autenticado cambie su propia contraseña
+                        // 1. UNIVERSAL: Cualquier usuario logueado puede cambiar su PROPIA clave o foto
+                        // Se usa .authenticated() para que aplique a Docentes, Asistentes, Admins, etc.
                         .requestMatchers(HttpMethod.PATCH, "/api/v*/usuarios/cambiar-contrasena").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v*/usuarios/actualizar-foto").authenticated()
 
-                        // ADMINISTRADOR tiene acceso total (v1 y v2)
-                        .requestMatchers(HttpMethod.GET, "/api/v*/usuarios").hasRole("ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.GET, "/api/v*/usuarios/**").hasRole("ADMINISTRADOR")
+                        // 2. LECTURA (Listar usuarios): Solo roles que gestionan personal
+                        .requestMatchers(HttpMethod.GET, "/api/v*/usuarios/**")
+                        .hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR", "GESTOR_PEDIDOS", "PROFESOR_A_CARGO")
 
-                        // ⚠️ TEMPORAL: Creador de Usuarios sin ROL (para desarrollo)
-                        // En producción, cambiar a .hasRole("ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.POST, "/api/v*/usuarios").permitAll()
+                        // 3. GESTIÓN ADMINISTRATIVA (Crear/Editar otros usuarios)
+                        .requestMatchers(HttpMethod.POST, "/api/v*/usuarios").hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PUT, "/api/v*/usuarios/**").hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR")
 
-                        .requestMatchers(HttpMethod.PUT, "/api/v*/usuarios/**").hasRole("ADMINISTRADOR")
+                        // 4. ELIMINACIÓN: Solo el Administrador principal
                         .requestMatchers(HttpMethod.DELETE, "/api/v*/usuarios/**").hasRole("ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.PATCH, "/api/v*/usuarios/**").hasRole("ADMINISTRADOR")
 
                         // ========================================
                         // ENDPOINTS DE PRODUCTOS
