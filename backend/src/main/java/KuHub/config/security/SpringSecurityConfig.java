@@ -226,24 +226,46 @@ public class SpringSecurityConfig {
                         // ========================================
                         // ENDPOINTS DE INVENTARIO
                         // ========================================
-                        // Inventario - lectura pública, modificación restringida
+                        // 1. Lectura: Permitida para todos (Público o Autenticados)
                         .requestMatchers(HttpMethod.GET, "/api/v*/inventario/**").permitAll()
 
-                        .requestMatchers(HttpMethod.POST, "/api/v*/inventario/**").hasAnyRole("ADMINISTRADOR", "ENCARGADO_BODEGA")
-                        .requestMatchers(HttpMethod.PUT, "/api/v*/inventario/**").hasAnyRole("ADMINISTRADOR", "ENCARGADO_BODEGA")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v*/inventario/**").hasRole("ADMINISTRADOR")
+                        // 2. Creación (POST): Administradores, Co-Admins, Gestores y Encargados de Bodega
+                        .requestMatchers(HttpMethod.POST, "/api/v*/inventario/**")
+                        .hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR", "GESTOR_PEDIDOS", "ENCARGADO_BODEGA")
 
+                        // 3. Modificación (PUT): Los mismos que pueden crear (incluyendo el ajuste de stock)
+                        .requestMatchers(HttpMethod.PUT, "/api/v*/inventario/**")
+                        .hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR", "GESTOR_PEDIDOS", "ENCARGADO_BODEGA")
+
+                        // 4. Eliminación (DELETE): Acceso restringido solo a la jerarquía más alta
+                        .requestMatchers(HttpMethod.DELETE, "/api/v*/inventario/**")
+                        .hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR")
+
+                        // ========================================
+                        // ENDPOINTS DE MOVIMIENTOS DE INVENTARIO
+                        // ========================================
+
+                        // Centraliza la seguridad solo para las peticiones POST de movimientos
+                        .requestMatchers(HttpMethod.POST, "/api/v1/movimiento/**")
+                        .hasAnyRole("ADMINISTRADOR", "GESTOR_PEDIDOS", "ENCARGADO_BODEGA", "ASISTENTE_BODEGA")
 
                         // ========================================
                         // ENDPOINTS DE RECETAS
                         // ========================================
-                        // Lectura de recetas - permitido para cualquier usuario que haya hecho login
-                        .requestMatchers(HttpMethod.GET, "/api/v*/receta/**").authenticated()
+                        // 1. Lectura de recetas: Permitido para todos los roles autorizados
+                        .requestMatchers(HttpMethod.GET, "/api/v*/receta/**")
+                        .hasAnyRole("ADMINISTRADOR", "PROFESOR_A_CARGO", "GESTOR_PEDIDOS", "CO_ADMINISTRADOR", "DOCENTE")
 
-                        // Creación, Modificación y Eliminación - EXCLUSIVO ADMINISTRADOR
-                        .requestMatchers(HttpMethod.POST, "/api/v*/receta/**").hasRole("ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.PUT, "/api/v*/receta/**").hasRole("ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v*/receta/**").hasRole("ADMINISTRADOR")
+                        // 2. Creación y Modificación: Permitido para roles de gestión
+                        .requestMatchers(HttpMethod.POST, "/api/v*/receta/**")
+                        .hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR", "PROFESOR_A_CARGO")
+
+                        .requestMatchers(HttpMethod.PUT, "/api/v*/receta/**")
+                        .hasAnyRole("ADMINISTRADOR", "CO_ADMINISTRADOR", "PROFESOR_A_CARGO")
+
+                        // 3. Eliminación (Opcional): Generalmente solo el Administrador
+                        .requestMatchers(HttpMethod.DELETE, "/api/v*/receta/**")
+                        .hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.PATCH, "/api/v*/receta/**").hasRole("ADMINISTRADOR")
 
                         // ========================================
