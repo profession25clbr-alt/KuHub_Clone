@@ -489,6 +489,7 @@ const FormularioProducto: React.FC<FormularioProductoProps> = ({ producto, onClo
 
         const datosActualizacion = {
           id: producto.id,
+          idInventario: producto._idInventario,
           nombre: nombre.trim(),
           descripcion: descripcion.trim(),
           categoria: categoria.trim(),

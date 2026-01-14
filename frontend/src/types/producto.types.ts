@@ -46,6 +46,7 @@ export interface ICrearProducto {
  */
 export interface IActualizarProducto extends Partial<ICrearProducto> {
   id: string;
+  idInventario?: number;
 }
 
 /**

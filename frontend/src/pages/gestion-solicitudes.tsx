@@ -3,7 +3,7 @@ import {
   Card, CardBody, Button, Input, Select, SelectItem, Chip,
   Table, TableHeader, TableColumn, TableBody, TableRow, TableCell,
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure,
-  Textarea, Tabs, Tab, Divider, Tooltip, Selection
+  Textarea, Tabs, Tab, Divider, Tooltip, Selection, Pagination
 } from '@heroui/react';
 import { Icon } from '@iconify/react';
 import { motion } from 'framer-motion';
@@ -35,7 +35,7 @@ const GestionSolicitudesPage: React.FC = () => {
   const [filtroAsignatura, setFiltroAsignatura] = useState<Selection>(new Set([]));
   const [busqueda, setBusqueda] = useState('');
   const [tabSeleccionada, setTabSeleccionada] = useState('todas');
-  
+
   const [contadores, setContadores] = useState({
     pendientes: 0,
     aceptadas: 0,
@@ -43,16 +43,21 @@ const GestionSolicitudesPage: React.FC = () => {
     total: 0
   });
 
+  // State for pagination
+  const [page, setPage] = useState(1);
+  const rowsPerPage = 10;
+
+
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [solicitudSeleccionada, setSolicitudSeleccionada] = useState<ISolicitud | null>(null);
   const [accionModal, setAccionModal] = useState<'aprobar' | 'rechazar'>('aprobar');
   const [comentarioRechazo, setComentarioRechazo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const esAdmin = hasSpecificPermission('gestion-pedidos') || 
-                 user?.rol === 'Admin' || 
-                 user?.rol === 'Co-Admin' ||
-                 user?.rol === 'Gestor de Pedidos';
+  const esAdmin = hasSpecificPermission('gestion-pedidos') ||
+    user?.rol === 'Admin' ||
+    user?.rol === 'Co-Admin' ||
+    user?.rol === 'Gestor de Pedidos';
   const esAdministradorGeneral = user?.rol === 'Administrador';
 
   useEffect(() => {
@@ -62,11 +67,11 @@ const GestionSolicitudesPage: React.FC = () => {
   const cargarDatos = async () => {
     try {
       setIsLoading(true);
-      
-      const solicitudesData = esAdmin 
+
+      const solicitudesData = esAdmin
         ? await obtenerTodasSolicitudesService()
         : await obtenerMisSolicitudesService();
-      
+
       setSolicitudes(solicitudesData);
 
       const conteosData = await obtenerConteoSolicitudesService();
@@ -127,8 +132,8 @@ const GestionSolicitudesPage: React.FC = () => {
         accionModal === 'rechazar' ? comentarioRechazo : undefined
       );
 
-      toast.success(accionModal === 'aprobar' 
-        ? 'Solicitud aceptada correctamente' 
+      toast.success(accionModal === 'aprobar'
+        ? 'Solicitud aceptada correctamente'
         : 'Solicitud rechazada correctamente'
       );
 
@@ -268,6 +273,17 @@ const GestionSolicitudesPage: React.FC = () => {
     return true;
   });
 
+  // Calculate pages and items for current page
+  const pages = Math.ceil(solicitudesFiltradas.length / rowsPerPage);
+
+  const items = React.useMemo(() => {
+    const start = (page - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+
+    return solicitudesFiltradas.slice(start, end);
+  }, [page, solicitudesFiltradas]);
+
+
   const getColorEstado = (estado: EstadoSolicitud) => {
     switch (estado) {
       case 'Pendiente': return 'warning';
@@ -300,12 +316,12 @@ const GestionSolicitudesPage: React.FC = () => {
               {esAdmin ? 'Gestión de Solicitudes' : 'Mis Solicitudes'}
             </h1>
             <p className="text-default-500">
-              {esAdmin 
+              {esAdmin
                 ? 'Revisa y aprueba las solicitudes de los profesores'
                 : 'Gestiona tus solicitudes de insumos'}
             </p>
           </div>
-          
+
           {esAdmin && contadores.pendientes > 0 && (
             <Button
               color="success"
@@ -325,7 +341,7 @@ const GestionSolicitudesPage: React.FC = () => {
               <p className="text-3xl font-bold text-primary">{contadores.total}</p>
             </CardBody>
           </Card>
-          
+
           <Card>
             <CardBody className="text-center p-4">
               <p className="text-sm text-default-500">Pendientes</p>
@@ -390,22 +406,28 @@ const GestionSolicitudesPage: React.FC = () => {
                 placeholder="Filtrar por semana"
                 selectedKeys={filtroSemana}
                 onSelectionChange={setFiltroSemana}
+                items={[
+                  { key: 'todas', label: 'Todas las semanas' },
+                  ...semanasDisponibles.map((semana) => ({ key: semana.toString(), label: `Semana ${semana}` }))
+                ]}
               >
-                <SelectItem key="todas">Todas las semanas</SelectItem>
-                {semanasDisponibles.map((semana) => (
-                  <SelectItem key={semana.toString()}>Semana {semana}</SelectItem>
-                ))}
+                {(item) => (
+                  <SelectItem key={item.key}>{item.label}</SelectItem>
+                )}
               </Select>
 
               <Select
                 placeholder="Filtrar por asignatura"
                 selectedKeys={filtroAsignatura}
                 onSelectionChange={setFiltroAsignatura}
+                items={[
+                  { key: 'todas', label: 'Todas las asignaturas' },
+                  ...asignaturasDisponibles.map((asignatura) => ({ key: asignatura, label: asignatura }))
+                ]}
               >
-                <SelectItem key="todas">Todas las asignaturas</SelectItem>
-                {asignaturasDisponibles.map((asignatura) => (
-                  <SelectItem key={asignatura}>{asignatura}</SelectItem>
-                ))}
+                {(item) => (
+                  <SelectItem key={item.key}>{item.label}</SelectItem>
+                )}
               </Select>
             </div>
           </CardBody>
@@ -429,9 +451,24 @@ const GestionSolicitudesPage: React.FC = () => {
 
             <Divider />
 
-            <Table 
+            <Table
               aria-label="Tabla de solicitudes"
               removeWrapper
+              bottomContent={
+                pages > 0 ? (
+                  <div className="flex w-full justify-center">
+                    <Pagination
+                      isCompact
+                      showControls
+                      showShadow
+                      color="primary"
+                      page={page}
+                      total={pages}
+                      onChange={(page) => setPage(page)}
+                    />
+                  </div>
+                ) : null
+              }
             >
               <TableHeader>
                 {esAdmin ? (
@@ -458,7 +495,7 @@ const GestionSolicitudesPage: React.FC = () => {
                 )}
               </TableHeader>
               <TableBody emptyContent="No hay solicitudes para mostrar">
-                {solicitudesFiltradas.map((solicitud) =>
+                {items.map((solicitud) =>
                   esAdmin ? (
                     <TableRow key={solicitud.id}>
                       <TableCell>{solicitud.profesorNombre}</TableCell>

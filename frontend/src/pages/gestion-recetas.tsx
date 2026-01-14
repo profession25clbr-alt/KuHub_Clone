@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  Table, 
-  TableHeader, 
-  TableColumn, 
-  TableBody, 
-  TableRow, 
+import {
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
   TableCell,
   Button,
   Card,
@@ -29,11 +29,11 @@ import { useToast, useConfirm } from '../hooks/useToast';
 import { useAuth } from '../contexts/auth-context';
 
 // IMPORTAR TIPOS Y SERVICIOS
-import { IReceta, IIngrediente } from '../types/receta.types';
+import { IReceta, IItemReceta, IGuardarReceta } from '../types/receta.types';
 import { IProducto } from '../types/producto.types';
-import { 
-  obtenerRecetasService, 
-  crearRecetaService, 
+import {
+  obtenerRecetasService,
+  crearRecetaService,
   actualizarRecetaService,
   cambiarEstadoRecetaService,
   eliminarRecetaService,
@@ -41,7 +41,7 @@ import {
 import { obtenerProductosService } from '../services/producto-service';
 
 /**
- * Página de gestión de recetas simplificada.
+ * Página de gestión de recetas conectada al backend.
  */
 const GestionRecetasPage: React.FC = () => {
   const toast = useToast();
@@ -58,7 +58,7 @@ const GestionRecetasPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = React.useState<string>('');
   const [currentPage, setCurrentPage] = React.useState<number>(1);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
-  
+
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const rowsPerPage = 5;
 
@@ -77,7 +77,6 @@ const GestionRecetasPage: React.FC = () => {
       setRecetas(recetasCargadas);
       setProductos(productosCargados);
       console.log('📋 Recetas cargadas:', recetasCargadas.length);
-      console.log('📦 Productos cargados:', productosCargados.length);
     } catch (error) {
       console.error('❌ Error al cargar datos:', error);
       toast.error('Error al cargar las recetas');
@@ -89,9 +88,9 @@ const GestionRecetasPage: React.FC = () => {
   React.useEffect(() => {
     let filtered = [...recetas];
     if (searchTerm) {
-      filtered = filtered.filter(receta => 
-        receta.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (receta.descripcion && receta.descripcion.toLowerCase().includes(searchTerm.toLowerCase()))
+      filtered = filtered.filter(receta =>
+        receta.nombreReceta.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (receta.descripcionReceta && receta.descripcionReceta.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
     setFilteredRecetas(filtered);
@@ -122,46 +121,28 @@ const GestionRecetasPage: React.FC = () => {
     onOpen();
   };
 
-  const cambiarEstadoReceta = async (id: string, nuevoEstado: 'Activa' | 'Inactiva') => {
+  const cambiarEstadoReceta = async (id: number, nuevoEstado: 'ACTIVO' | 'INACTIVO') => {
     try {
       console.log(`🔄 Cambiando estado de receta ${id} a ${nuevoEstado}`);
-      await cambiarEstadoRecetaService(id, nuevoEstado === 'Activa');
+      await cambiarEstadoRecetaService(id, nuevoEstado === 'ACTIVO');
       await cargarDatos();
-      toast.success(`Receta ${nuevoEstado.toLowerCase()} correctamente`);
+      toast.success(`Receta ${nuevoEstado === 'ACTIVO' ? 'activada' : 'desactivada'} correctamente`);
     } catch (error) {
       console.error('❌ Error al cambiar estado:', error);
       toast.error('Error al cambiar el estado de la receta');
     }
   };
 
-  const handleGuardarReceta = async (receta: IReceta) => {
+  const handleGuardarReceta = async (recetaData: IGuardarReceta) => {
     try {
       if (modalMode === 'crear') {
-        console.log('📝 Creando nueva receta:', receta.nombre);
-        await crearRecetaService({
-          nombre: receta.nombre,
-          descripcion: receta.descripcion,
-          ingredientes: receta.ingredientes.map(ing => ({
-            productoId: ing.productoId,
-            productoNombre: ing.productoNombre,
-            cantidad: ing.cantidad,
-            unidadMedida: ing.unidadMedida
-          })),
-          instrucciones: receta.instrucciones,
-          estado: receta.estado
-        });
-        toast.success('Receta creada correctamente');
+        console.log('📝 Creando nueva receta:', recetaData.nombreReceta);
+        await crearRecetaService(recetaData);
+        toast.success('Receta creada correctamente (Simulado)');
       } else if (modalMode === 'editar') {
-        console.log('✏️ Actualizando receta:', receta.nombre);
-        await actualizarRecetaService({
-          id: receta.id,
-          nombre: receta.nombre,
-          descripcion: receta.descripcion,
-          ingredientes: receta.ingredientes,
-          instrucciones: receta.instrucciones,
-          estado: receta.estado
-        });
-        toast.success('Receta actualizada correctamente');
+        console.log('✏️ Actualizando receta:', recetaData.nombreReceta);
+        await actualizarRecetaService(recetaData);
+        toast.success('Receta actualizada correctamente (Simulado)');
       }
       await cargarDatos();
     } catch (error: any) {
@@ -178,7 +159,7 @@ const GestionRecetasPage: React.FC = () => {
     }
 
     const confirmado = await confirm(
-      `Eliminarás definitivamente la receta "${receta.nombre}".`,
+      `Eliminarás definitivamente la receta "${receta.nombreReceta}".`,
       {
         title: 'Eliminar receta',
         confirmText: 'Eliminar',
@@ -191,7 +172,7 @@ const GestionRecetasPage: React.FC = () => {
     if (!confirmado) return;
 
     try {
-      await eliminarRecetaService(receta.id);
+      await eliminarRecetaService(receta.idReceta);
       toast.success('Receta eliminada correctamente');
       await cargarDatos();
     } catch (error: any) {
@@ -201,8 +182,8 @@ const GestionRecetasPage: React.FC = () => {
 
   const renderEstado = (estado: string) => {
     switch (estado) {
-      case 'Activa': return <Chip color="success" size="sm">{estado}</Chip>;
-      case 'Inactiva': return <Chip color="danger" size="sm">{estado}</Chip>;
+      case 'ACTIVO': return <Chip color="success" size="sm">ACTIVA</Chip>;
+      case 'INACTIVO': return <Chip color="danger" size="sm">INACTIVA</Chip>;
       default: return <Chip size="sm">{estado}</Chip>;
     }
   };
@@ -239,8 +220,8 @@ const GestionRecetasPage: React.FC = () => {
             )}
           </div>
           {!esSoloLectura && (
-            <Button 
-              color="primary" 
+            <Button
+              color="primary"
               startContent={<Icon icon="lucide:plus" />}
               onPress={handleNuevaReceta}
             >
@@ -261,7 +242,7 @@ const GestionRecetasPage: React.FC = () => {
             <CardBody className="text-center p-4">
               <p className="text-sm text-default-500">Activas</p>
               <p className="text-3xl font-bold text-success">
-                {recetas.filter(r => r.estado === 'Activa').length}
+                {recetas.filter(r => r.estadoReceta === 'ACTIVO').length}
               </p>
             </CardBody>
           </Card>
@@ -269,7 +250,7 @@ const GestionRecetasPage: React.FC = () => {
             <CardBody className="text-center p-4">
               <p className="text-sm text-default-500">Inactivas</p>
               <p className="text-3xl font-bold text-danger">
-                {recetas.filter(r => r.estado === 'Inactiva').length}
+                {recetas.filter(r => r.estadoReceta === 'INACTIVO').length}
               </p>
             </CardBody>
           </Card>
@@ -291,7 +272,7 @@ const GestionRecetasPage: React.FC = () => {
         {/* Tabla */}
         <Card className="shadow-sm">
           <CardBody className="p-0">
-            <Table 
+            <Table
               aria-label="Tabla de recetas"
               removeWrapper
               bottomContent={
@@ -316,53 +297,55 @@ const GestionRecetasPage: React.FC = () => {
               </TableHeader>
               <TableBody emptyContent="No se encontraron recetas">
                 {paginatedRecetas.map((receta) => (
-                  <TableRow key={receta.id}>
+                  <TableRow key={receta.idReceta}>
                     <TableCell>
-                      <p className="font-medium">{receta.nombre}</p>
+                      <p className="font-medium">{receta.nombreReceta}</p>
                     </TableCell>
                     <TableCell>
                       <p className="text-sm text-default-500 line-clamp-2">
-                        {receta.descripcion || '-'}
+                        {receta.descripcionReceta || '-'}
                       </p>
                     </TableCell>
                     <TableCell>
                       <Chip size="sm" variant="flat">
-                        {receta.ingredientes.length} ingredientes
+                        {(receta.listaItems?.length || 0)} ingredientes
                       </Chip>
                     </TableCell>
-                    <TableCell>{renderEstado(receta.estado)}</TableCell>
+                    <TableCell>{renderEstado(receta.estadoReceta)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button 
-                          isIconOnly 
-                          variant="light" 
-                          size="sm" 
+                        <Button
+                          isIconOnly
+                          variant="light"
+                          size="sm"
                           onPress={() => handleVerReceta(receta)}
                         >
                           <Icon icon="lucide:eye" className="text-primary" />
                         </Button>
                         {!esSoloLectura && (
                           <>
-                            <Button 
-                              isIconOnly 
-                              variant="light" 
-                              size="sm" 
+                            <Button
+                              isIconOnly
+                              variant="light"
+                              size="sm"
+                              isDisabled // Deshabilitado porque falta endpoint de edición de contenido
+                              title="Edición no disponible por el momento"
                               onPress={() => handleEditarReceta(receta)}
                             >
-                              <Icon icon="lucide:edit" className="text-primary" />
+                              <Icon icon="lucide:edit" className="text-default-300" />
                             </Button>
-                            <Button 
-                              isIconOnly 
-                              variant="light" 
-                              size="sm" 
+                            <Button
+                              isIconOnly
+                              variant="light"
+                              size="sm"
                               onPress={() => cambiarEstadoReceta(
-                                receta.id, 
-                                receta.estado === 'Activa' ? 'Inactiva' : 'Activa'
+                                receta.idReceta,
+                                receta.estadoReceta === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'
                               )}
                             >
-                              <Icon 
-                                icon={receta.estado === 'Activa' ? 'lucide:x' : 'lucide:check'} 
-                                className={receta.estado === 'Activa' ? 'text-danger' : 'text-success'} 
+                              <Icon
+                                icon={receta.estadoReceta === 'ACTIVO' ? 'lucide:x' : 'lucide:check'}
+                                className={receta.estadoReceta === 'ACTIVO' ? 'text-danger' : 'text-success'}
                               />
                             </Button>
                             {esAdministrador && (
@@ -390,14 +373,14 @@ const GestionRecetasPage: React.FC = () => {
       <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="3xl" scrollBehavior="inside">
         <ModalContent>
           {(onClose) => (
-            <DetalleReceta 
-              receta={recetaSeleccionada} 
+            <DetalleReceta
+              receta={recetaSeleccionada}
               mode={modalMode}
               productos={productos}
               onClose={onClose}
-              onSave={async (nuevaReceta) => {
+              onSave={async (recetaData) => {
                 try {
-                  await handleGuardarReceta(nuevaReceta);
+                  await handleGuardarReceta(recetaData);
                   onClose();
                 } catch (error) {
                   // Error ya manejado
@@ -416,7 +399,7 @@ interface DetalleRecetaProps {
   mode: 'crear' | 'editar' | 'ver';
   productos: IProducto[];
   onClose: () => void;
-  onSave: (receta: IReceta) => Promise<void>;
+  onSave: (receta: IGuardarReceta) => Promise<void>;
 }
 
 const DetalleReceta: React.FC<DetalleRecetaProps> = ({ receta, mode, productos, onClose, onSave }) => {
@@ -443,12 +426,11 @@ const DetalleReceta: React.FC<DetalleRecetaProps> = ({ receta, mode, productos, 
         {mode === 'ver' ? (
           receta && <VistaReceta receta={receta} />
         ) : (
-          <FormularioReceta 
+          <FormularioReceta
             ref={formRef}
-            receta={receta} 
-            mode={mode}
+            receta={receta}
             productos={productos}
-            onSave={onSave} 
+            onSave={onSave}
           />
         )}
       </ModalBody>
@@ -457,8 +439,8 @@ const DetalleReceta: React.FC<DetalleRecetaProps> = ({ receta, mode, productos, 
           {mode === 'ver' ? 'Cerrar' : 'Cancelar'}
         </Button>
         {mode !== 'ver' && (
-          <Button 
-            color="primary" 
+          <Button
+            color="primary"
             onPress={handleSubmit}
             isLoading={isSaving}
             isDisabled={isSaving}
@@ -479,27 +461,27 @@ const VistaReceta: React.FC<VistaRecetaProps> = ({ receta }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-xl font-semibold mb-2">{receta.nombre}</h3>
-        {receta.descripcion && (
-          <p className="text-default-500">{receta.descripcion}</p>
+        <h3 className="text-xl font-semibold mb-2">{receta.nombreReceta}</h3>
+        {receta.descripcionReceta && (
+          <p className="text-default-500">{receta.descripcionReceta}</p>
         )}
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <p className="text-sm text-default-500">Estado</p>
-          <Chip color={receta.estado === 'Activa' ? 'success' : 'danger'} size="sm">
-            {receta.estado}
+          <Chip color={receta.estadoReceta === 'ACTIVO' ? 'success' : 'danger'} size="sm">
+            {receta.estadoReceta}
           </Chip>
         </div>
         <div>
           <p className="text-sm text-default-500">Ingredientes</p>
-          <p className="font-medium">{receta.ingredientes.length} ingredientes</p>
+          <p className="font-medium">{(receta.listaItems?.length || 0)} ingredientes</p>
         </div>
       </div>
-      
+
       <Divider />
-      
+
       <div>
         <h4 className="font-semibold mb-3">📦 Ingredientes</h4>
         <Table aria-label="Ingredientes" removeWrapper>
@@ -508,20 +490,20 @@ const VistaReceta: React.FC<VistaRecetaProps> = ({ receta }) => {
             <TableColumn>CANTIDAD</TableColumn>
           </TableHeader>
           <TableBody>
-            {receta.ingredientes.map((ingrediente) => (
-              <TableRow key={ingrediente.id}>
-                <TableCell>{ingrediente.productoNombre}</TableCell>
+            {(receta.listaItems || []).map((item, idx) => (
+              <TableRow key={item.idProducto + '-' + idx}>
+                <TableCell>{item.nombreProducto}</TableCell>
                 <TableCell className="font-semibold">
-                  {ingrediente.cantidad} {ingrediente.unidadMedida}
+                  {item.cantUnidadMedida} {item.unidadMedida}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
-      
+
       <Divider />
-      
+
       <div>
         <h4 className="font-semibold mb-3">📝 Instrucciones</h4>
         <div className="whitespace-pre-line bg-default-50 p-4 rounded-md text-sm">
@@ -534,19 +516,20 @@ const VistaReceta: React.FC<VistaRecetaProps> = ({ receta }) => {
 
 interface FormularioRecetaProps {
   receta: IReceta | null;
-  mode: 'crear' | 'editar';
   productos: IProducto[];
-  onSave: (receta: IReceta) => Promise<void>;
+  onSave: (receta: IGuardarReceta) => Promise<void>;
 }
 
 const FormularioReceta = React.forwardRef<any, FormularioRecetaProps>(
-  ({ receta, mode, productos, onSave }, ref) => {
+  ({ receta, productos, onSave }, ref) => {
     const toast = useToast();
-    const [nombre, setNombre] = React.useState(receta?.nombre || '');
-    const [descripcion, setDescripcion] = React.useState(receta?.descripcion || '');
+    const [nombre, setNombre] = React.useState(receta?.nombreReceta || '');
+    const [descripcion, setDescripcion] = React.useState(receta?.descripcionReceta || '');
     const [instrucciones, setInstrucciones] = React.useState(receta?.instrucciones || '');
-    const [estado, setEstado] = React.useState<'Activa' | 'Inactiva'>(receta?.estado || 'Activa');
-    const [ingredientes, setIngredientes] = React.useState<IIngrediente[]>(receta?.ingredientes || []);
+    const [estado, setEstado] = React.useState<'ACTIVO' | 'INACTIVO'>(receta?.estadoReceta || 'ACTIVO');
+
+    // Convertir de IItemReceta a la estructura editable si es necesario, por ahora usamos la misma
+    const [items, setItems] = React.useState<IItemReceta[]>(receta?.listaItems || []);
 
     React.useImperativeHandle(ref, () => ({
       submit: async () => {
@@ -555,33 +538,30 @@ const FormularioReceta = React.forwardRef<any, FormularioRecetaProps>(
           toast.warning('El nombre de la receta es obligatorio');
           throw new Error('El nombre es requerido');
         }
-        if (ingredientes.length === 0) {
+        if (items.length === 0) {
           toast.warning('Debe agregar al menos un ingrediente');
           throw new Error('Debe agregar al menos un ingrediente');
         }
-        
-        // Validar que todos los ingredientes tengan producto y cantidad
-        for (let i = 0; i < ingredientes.length; i++) {
-          const ing = ingredientes[i];
-          if (!ing.productoId) {
+
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (!item.idProducto) {
             toast.warning(`Seleccione un producto para el ingrediente ${i + 1}`);
             throw new Error('Producto no seleccionado');
           }
-          if (ing.cantidad <= 0) {
+          if (item.cantUnidadMedida <= 0) {
             toast.warning(`La cantidad del ingrediente ${i + 1} debe ser mayor a 0`);
             throw new Error('Cantidad inválida');
           }
         }
 
-        const recetaData: IReceta = {
-          id: receta?.id || '',
-          nombre: nombre.trim(),
-          descripcion: descripcion.trim(),
-          ingredientes,
+        const recetaData: IGuardarReceta = {
+          idReceta: receta?.idReceta,
+          nombreReceta: nombre.trim(),
+          descripcionReceta: descripcion.trim(),
+          listaItems: items,
           instrucciones: instrucciones.trim(),
-          estado,
-          fechaCreacion: receta?.fechaCreacion || new Date().toISOString(),
-          fechaActualizacion: new Date().toISOString(),
+          estadoReceta: estado
         };
 
         await onSave(recetaData);
@@ -589,71 +569,71 @@ const FormularioReceta = React.forwardRef<any, FormularioRecetaProps>(
     }));
 
     const agregarIngrediente = () => {
-      const nuevoIngrediente: IIngrediente = {
-        id: Date.now().toString(),
-        productoId: '',
-        productoNombre: '',
-        cantidad: 0,
-        unidadMedida: ''
+      const nuevoItem: IItemReceta = {
+        idProducto: 0,
+        nombreProducto: '',
+        cantUnidadMedida: 0,
+        unidadMedida: '',
+        activo: true
       };
-      setIngredientes([...ingredientes, nuevoIngrediente]);
+      setItems([...items, nuevoItem]);
     };
 
-    const actualizarIngrediente = (index: number, campo: keyof IIngrediente, valor: any) => {
-      const nuevosIngredientes = [...ingredientes];
-      
-      if (campo === 'productoId') {
-        const producto = productos.find(p => p.id === valor);
+    const actualizarItem = (index: number, campo: keyof IItemReceta, valor: any) => {
+      const nuevosItems = [...items];
+
+      if (campo === 'idProducto') {
+        const producto = productos.find(p => p.id === valor); // productos.id es string, valor es string del select
         if (producto) {
-          nuevosIngredientes[index] = {
-            ...nuevosIngredientes[index],
-            productoId: producto.id,
-            productoNombre: producto.nombre,
+          nuevosItems[index] = {
+            ...nuevosItems[index],
+            idProducto: Number(producto.id), // Asumimos que id es numérico o compatible, backend pide number
+            nombreProducto: producto.nombre,
             unidadMedida: producto.unidadMedida
           };
         }
       } else {
-        nuevosIngredientes[index] = {
-          ...nuevosIngredientes[index],
+        nuevosItems[index] = {
+          ...nuevosItems[index],
           [campo]: valor
         };
       }
-      
-      setIngredientes(nuevosIngredientes);
+
+      setItems(nuevosItems);
     };
 
-    const eliminarIngrediente = (index: number) => {
-      setIngredientes(ingredientes.filter((_, i) => i !== index));
+    const eliminarItem = (index: number) => {
+      setItems(items.filter((_, i) => i !== index));
     };
 
     return (
       <div className="space-y-4">
         <Input
           label="Nombre de la Receta"
-          placeholder="Ej: Pan Amasado, Torta de Chocolate, etc."
+          placeholder="Ej: Pan Amasado"
           value={nombre}
           onValueChange={setNombre}
           isRequired
           variant="bordered"
         />
-        
+
         <Textarea
           label="Descripción (Opcional)"
-          placeholder="Descripción breve de la receta..."
+          placeholder="Descripción breve..."
           value={descripcion}
           onValueChange={setDescripcion}
           variant="bordered"
           minRows={2}
         />
-        
+
         <Divider />
-        
+
         <div>
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-semibold">📦 Ingredientes</h4>
-            <Button 
-              size="sm" 
-              color="primary" 
+            <Button
+              size="sm"
+              color="primary"
               variant="flat"
               startContent={<Icon icon="lucide:plus" />}
               onPress={agregarIngrediente}
@@ -661,25 +641,25 @@ const FormularioReceta = React.forwardRef<any, FormularioRecetaProps>(
               Agregar
             </Button>
           </div>
-          
-          {ingredientes.length === 0 ? (
+
+          {items.length === 0 ? (
             <div className="text-center p-8 bg-default-50 rounded-lg">
               <Icon icon="lucide:package-open" className="text-default-300 text-4xl mx-auto mb-2" />
               <p className="text-default-500 text-sm">
-                No hay ingredientes. Click en "Agregar" para comenzar.
+                No hay ingredientes.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {ingredientes.map((ingrediente, index) => (
-                <Card key={ingrediente.id || index} shadow="none" className="border-2 border-default-200">
+              {items.map((item, index) => (
+                <Card key={index} shadow="none" className="border-2 border-default-200">
                   <CardBody className="p-3">
                     <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto_auto] gap-3 items-end">
-                      <Select 
+                      <Select
                         label="Producto"
                         placeholder="Seleccione producto"
-                        selectedKeys={ingrediente.productoId ? [ingrediente.productoId] : []}
-                        onSelectionChange={(keys) => actualizarIngrediente(index, 'productoId', Array.from(keys)[0])}
+                        selectedKeys={item.idProducto ? [item.idProducto.toString()] : []}
+                        onSelectionChange={(keys) => actualizarItem(index, 'idProducto', Array.from(keys)[0])}
                         size="sm"
                         variant="bordered"
                         isRequired
@@ -690,34 +670,34 @@ const FormularioReceta = React.forwardRef<any, FormularioRecetaProps>(
                           </SelectItem>
                         ))}
                       </Select>
-                      
-                      <Input 
+
+                      <Input
                         type="number"
                         label="Cantidad"
                         placeholder="0"
-                        value={ingrediente.cantidad.toString()}
-                        onValueChange={(val) => actualizarIngrediente(index, 'cantidad', parseFloat(val) || 0)}
+                        value={item.cantUnidadMedida.toString()}
+                        onValueChange={(val) => actualizarItem(index, 'cantUnidadMedida', parseFloat(val) || 0)}
                         size="sm"
                         variant="bordered"
                         min="0"
                         step="0.01"
                         endContent={
                           <span className="text-xs text-default-400">
-                            {ingrediente.unidadMedida || 'unidad'}
+                            {item.unidadMedida || 'unidad'}
                           </span>
                         }
                       />
-                      
+
                       <span className="text-sm text-default-500 mb-2">
-                        {ingrediente.unidadMedida || '-'}
+                        {item.unidadMedida || '-'}
                       </span>
-                      
-                      <Button 
-                        isIconOnly 
-                        variant="light" 
+
+                      <Button
+                        isIconOnly
+                        variant="light"
                         size="sm"
                         color="danger"
-                        onPress={() => eliminarIngrediente(index)}
+                        onPress={() => eliminarItem(index)}
                       >
                         <Icon icon="lucide:trash" />
                       </Button>
@@ -728,26 +708,25 @@ const FormularioReceta = React.forwardRef<any, FormularioRecetaProps>(
             </div>
           )}
         </div>
-        
+
         <Divider />
-        
+
         <Textarea
-          label="Instrucciones (Opcional)"
-          placeholder="Paso 1: ...&#10;Paso 2: ...&#10;Paso 3: ..."
+          label="Instrucciones"
           value={instrucciones}
           onValueChange={setInstrucciones}
           variant="bordered"
           minRows={5}
         />
-        
-        <Select 
+
+        <Select
           label="Estado"
           selectedKeys={[estado]}
-          onSelectionChange={(keys) => setEstado(Array.from(keys)[0] as 'Activa' | 'Inactiva')}
+          onSelectionChange={(keys) => setEstado(Array.from(keys)[0] as 'ACTIVO' | 'INACTIVO')}
           variant="bordered"
         >
-          <SelectItem key="Activa">Activa</SelectItem>
-          <SelectItem key="Inactiva">Inactiva</SelectItem>
+          <SelectItem key="ACTIVO">Activa</SelectItem>
+          <SelectItem key="INACTIVO">Inactiva</SelectItem>
         </Select>
       </div>
     );

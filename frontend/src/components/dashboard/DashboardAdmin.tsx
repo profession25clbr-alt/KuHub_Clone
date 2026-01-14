@@ -89,7 +89,7 @@ interface AsignaturaConSolicitud {
   codigo: string;
   nombre: string;
   profesorCoordinador: string;
-  solicitud: ISolicitud | null;
+  solicitudes: ISolicitud[];
   totalSecciones: number;
 }
 
@@ -109,6 +109,7 @@ export const DashboardAdmin: React.FC = () => {
   // Estados del proceso
   const [estadoProceso, setEstadoProceso] = useState(obtenerEstadoProceso());
   const [semanaSeleccionada, setSemanaSeleccionada] = useState<number | null>(estadoProceso.semanaSeleccionada);
+  const [expandedAsignaturas, setExpandedAsignaturas] = useState<Set<string>>(new Set());
 
   // Estados para modales
   const { isOpen: isPendientesOpen, onOpen: onPendientesOpen, onOpenChange: onPendientesOpenChange } = useDisclosure();
@@ -170,6 +171,18 @@ export const DashboardAdmin: React.FC = () => {
     const estado = obtenerEstadoProceso();
     setEstadoProceso(estado);
     setSemanaSeleccionada(estado.semanaSeleccionada);
+  };
+
+  const toggleAsignatura = (asignaturaId: string) => {
+    setExpandedAsignaturas((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(asignaturaId)) {
+        nuevo.delete(asignaturaId);
+      } else {
+        nuevo.add(asignaturaId);
+      }
+      return nuevo;
+    });
   };
 
   // Función para iniciar proceso
@@ -638,10 +651,8 @@ export const DashboardAdmin: React.FC = () => {
 
   const asignaturasParaMostrar = React.useMemo(() => {
     return asignaturas.map(asignatura => {
-      // Find request for this subject in the filtered week list
-      // Note: `solicitudes` objects contain `asignaturaId`.
-      // IAsignatura has `id` as string.
-      const solicitud = solicitudesSemana.find(s => String(s.asignaturaId) === String(asignatura.id)) || null;
+      // ✅ FIX: Get ALL requests for this subject
+      const solicitudesAsignatura = solicitudesSemana.filter(s => String(s.asignaturaId) === String(asignatura.id));
 
       return {
         id: asignatura.id,
@@ -649,7 +660,7 @@ export const DashboardAdmin: React.FC = () => {
         nombre: asignatura.nombre,
         profesorCoordinador: asignatura.profesorACargoNombre || 'Sin asignar',
         totalSecciones: asignatura.secciones ? asignatura.secciones.length : 0,
-        solicitud
+        solicitudes: solicitudesAsignatura
       };
     }).sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [asignaturas, solicitudesSemana]);
@@ -753,13 +764,24 @@ export const DashboardAdmin: React.FC = () => {
             className="lg:col-span-2"
           >
             <Card className="shadow-sm h-full">
-              <CardHeader className="pb-0 pt-4 px-4 flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Asignaturas y sus solicitudes</h3>
-                {estadoProceso.semanaSeleccionada && (
-                  <Chip color="primary" variant="flat" size="sm">
-                    Semana {estadoProceso.semanaSeleccionada}
-                  </Chip>
-                )}
+              <CardHeader className="pb-0 pt-4 px-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">Asignaturas y sus solicitudes</h3>
+                  {estadoProceso.semanaSeleccionada && (
+                    <Chip color="primary" variant="flat" size="sm">
+                      Semana {estadoProceso.semanaSeleccionada}
+                    </Chip>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  color="secondary"
+                  variant="flat"
+                  startContent={<Icon icon="lucide:list-checks" />}
+                  onPress={() => history.push('/gestion-solicitudes')}
+                >
+                  Gestión de Solicitudes
+                </Button>
               </CardHeader>
               <CardBody className="px-4 pb-4">
                 <Table removeWrapper aria-label="Asignaturas y solicitudes por semana">
@@ -770,60 +792,164 @@ export const DashboardAdmin: React.FC = () => {
                     <TableColumn>ACCIONES</TableColumn>
                   </TableHeader>
                   <TableBody emptyContent="No hay solicitudes registradas para esta semana">
-                    {asignaturasParaMostrar.map((asignatura) => (
-                      <TableRow key={asignatura.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{asignatura.nombre}</p>
-                            <p className="text-xs text-default-400">{asignatura.codigo}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-sm">{asignatura.profesorCoordinador}</p>
-                        </TableCell>
-                        <TableCell>
-                          {renderEstadoSolicitud(asignatura.solicitud?.estado ?? null)}
-                        </TableCell>
-                        <TableCell>
-                          {asignatura.solicitud ? (
-                            <div className="flex gap-2">
-                              <Button
-                                isIconOnly
-                                size="sm"
-                                variant="light"
-                                onPress={() => verDetalleSolicitud(asignatura.solicitud!)}
-                              >
-                                <Icon icon="lucide:eye" className="text-primary" />
-                              </Button>
-                              {asignatura.solicitud.estado === 'Pendiente' && (
-                                <>
+                    {asignaturasParaMostrar.map((asignatura) => {
+                      const tieneSolicitudes = asignatura.solicitudes && asignatura.solicitudes.length > 0;
+                      const esMultiple = asignatura.solicitudes && asignatura.solicitudes.length > 1;
+                      const isExpanded = expandedAsignaturas.has(asignatura.id);
+                      const solicitudPrincipal = tieneSolicitudes ? asignatura.solicitudes[0] : null;
+
+                      // Estado resumen para múltiples
+                      const conteoPendientes = asignatura.solicitudes.filter(s => s.estado === 'Pendiente').length;
+                      const conteoAceptadas = asignatura.solicitudes.filter(s => s.estado.includes('Aceptada')).length;
+
+                      return (
+                        <TableRow key={asignatura.id}>
+                          <TableCell>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <div>
+                                  <p className="font-medium">{asignatura.nombre}</p>
+                                  <p className="text-xs text-default-400">{asignatura.codigo}</p>
+                                </div>
+                                {esMultiple && (
                                   <Button
                                     isIconOnly
                                     size="sm"
                                     variant="light"
-                                    color="success"
-                                    onPress={() => abrirModalAprobar(asignatura.solicitud!)}
+                                    onPress={() => toggleAsignatura(asignatura.id)}
                                   >
-                                    <Icon icon="lucide:check" />
+                                    <Icon
+                                      icon={isExpanded ? "lucide:chevron-up" : "lucide:chevron-down"}
+                                      className="text-default-500"
+                                    />
                                   </Button>
-                                  <Button
-                                    isIconOnly
-                                    size="sm"
-                                    variant="light"
-                                    color="danger"
-                                    onPress={() => abrirModalRechazar(asignatura.solicitud!)}
-                                  >
-                                    <Icon icon="lucide:x" />
-                                  </Button>
-                                </>
+                                )}
+                              </div>
+
+                              {/* Sub-lista desplegable para múltiples solicitudes */}
+                              {esMultiple && isExpanded && (
+                                <div className="pl-2 border-l-2 border-default-200 space-y-2 mt-2">
+                                  {asignatura.solicitudes.map((solicitud) => (
+                                    <div key={solicitud.id} className="p-3 bg-content2/50 rounded-lg flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                      <div>
+                                        <p className="text-sm font-semibold">{solicitud.profesorNombre}</p>
+                                        <p className="text-xs text-default-500">
+                                          {new Date(solicitud.fecha).toLocaleDateString('es-CL')}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {renderEstadoSolicitud(solicitud.estado)}
+                                        <div className="flex gap-1">
+                                          <Button
+                                            isIconOnly
+                                            size="sm"
+                                            variant="light"
+                                            onPress={() => verDetalleSolicitud(solicitud)}
+                                          >
+                                            <Icon icon="lucide:eye" className="text-primary" />
+                                          </Button>
+                                          {solicitud.estado === 'Pendiente' && (
+                                            <>
+                                              <Button
+                                                isIconOnly
+                                                size="sm"
+                                                variant="light"
+                                                color="success"
+                                                onPress={() => abrirModalAprobar(solicitud)}
+                                              >
+                                                <Icon icon="lucide:check" />
+                                              </Button>
+                                              <Button
+                                                isIconOnly
+                                                size="sm"
+                                                variant="light"
+                                                color="danger"
+                                                onPress={() => abrirModalRechazar(solicitud)}
+                                              >
+                                                <Icon icon="lucide:x" />
+                                              </Button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
                               )}
                             </div>
-                          ) : (
-                            <span className="text-xs text-default-400">Sin solicitud</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+
+                          <TableCell>
+                            {esMultiple ? (
+                              <span className="text-sm italic text-default-500">Varios profesores</span>
+                            ) : (
+                              <p className="text-sm">
+                                {tieneSolicitudes
+                                  ? solicitudPrincipal?.profesorNombre
+                                  : asignatura.profesorCoordinador}
+                              </p>
+                            )}
+                          </TableCell>
+
+                          <TableCell>
+                            {esMultiple ? (
+                              <div className="flex flex-col gap-1">
+                                {conteoPendientes > 0 && (
+                                  <Chip size="sm" color="warning" variant="flat">{conteoPendientes} Pendientes</Chip>
+                                )}
+                                {conteoAceptadas > 0 && (
+                                  <Chip size="sm" color="success" variant="flat">{conteoAceptadas} Aceptadas</Chip>
+                                )}
+                                {conteoPendientes === 0 && conteoAceptadas === 0 && (
+                                  <Chip size="sm" variant="flat">{asignatura.solicitudes.length} Solicitudes</Chip>
+                                )}
+                              </div>
+                            ) : (
+                              renderEstadoSolicitud(solicitudPrincipal?.estado ?? null)
+                            )}
+                          </TableCell>
+
+                          <TableCell>
+                            {!esMultiple && solicitudPrincipal ? (
+                              <div className="flex gap-2">
+                                <Button
+                                  isIconOnly
+                                  size="sm"
+                                  variant="light"
+                                  onPress={() => verDetalleSolicitud(solicitudPrincipal)}
+                                >
+                                  <Icon icon="lucide:eye" className="text-primary" />
+                                </Button>
+                                {solicitudPrincipal.estado === 'Pendiente' && (
+                                  <>
+                                    <Button
+                                      isIconOnly
+                                      size="sm"
+                                      variant="light"
+                                      color="success"
+                                      onPress={() => abrirModalAprobar(solicitudPrincipal)}
+                                    >
+                                      <Icon icon="lucide:check" />
+                                    </Button>
+                                    <Button
+                                      isIconOnly
+                                      size="sm"
+                                      variant="light"
+                                      color="danger"
+                                      onPress={() => abrirModalRechazar(solicitudPrincipal)}
+                                    >
+                                      <Icon icon="lucide:x" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            ) : !tieneSolicitudes ? (
+                              <span className="text-xs text-default-400">Sin solicitud</span>
+                            ) : null}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardBody>

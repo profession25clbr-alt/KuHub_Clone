@@ -26,13 +26,17 @@ import {
 } from '@heroui/react';
 import { Icon } from '@iconify/react';
 import { motion } from 'framer-motion';
+// Services
+import { obtenerProductosService } from '../services/producto-service';
 import {
-  obtenerProductoPorIdService,
-  obtenerMovimientosFiltradosService,
   crearMovimientoService,
-  obtenerProductosService
-} from '../services/producto-service';
-import { IProducto, IMovimientoProducto } from '../types/producto.types';
+  obtenerMovimientosFiltradosService
+} from '../services/movimiento-service';
+// Types
+import { IProducto } from '../types/producto.types';
+import { IMovimiento, TipoMovimiento } from '../types/movimiento.types';
+// Contexts
+import { useAuth } from '../contexts/auth-context';
 
 /**
  * Interfaz para los parámetros de la URL.
@@ -58,25 +62,29 @@ const MovimientosProductoPage: React.FC = () => {
   const history = useHistory();
   const query = useQuery();
   const queryProductoId = query.get('productoId');
+  const { user } = useAuth();
 
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
   // Estado de datos
   const [productos, setProductos] = React.useState<IProducto[]>([]);
-  const [movimientos, setMovimientos] = React.useState<IMovimientoProducto[]>([]);
+  const [movimientos, setMovimientos] = React.useState<IMovimiento[]>([]);
   const [totalMovimientos, setTotalMovimientos] = React.useState<number>(0);
   const [productoActual, setProductoActual] = React.useState<IProducto | null>(null);
 
   // Estado de filtros
+  // filtroProducto stores the PRODUCT ID
   const [filtroProducto, setFiltroProducto] = React.useState<string | null>(id || queryProductoId || 'todos');
   const [filtroTipo, setFiltroTipo] = React.useState<string>('todos');
-  const [filtroOrden, setFiltroOrden] = React.useState<'reciente' | 'antiguo' | 'cantidad_asc' | 'cantidad_desc'>('reciente');
+  const [filtroOrden, setFiltroOrden] = React.useState<'reciente' | 'antiguo'>('reciente');
   const [filtroFecha, setFiltroFecha] = React.useState<string>('');
 
   const [currentPage, setCurrentPage] = React.useState<number>(1);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [isLoadingMovimientos, setIsLoadingMovimientos] = React.useState<boolean>(true);
 
+  // Pagination is handled by backend in slices? User example didn't show pagination params in body, 
+  // but let's assume filtering returns all or we just slice locally for now if API doesn't support pagination params in body.
   const rowsPerPage = 10;
 
   /**
@@ -92,8 +100,10 @@ const MovimientosProductoPage: React.FC = () => {
         const targetId = id || queryProductoId;
         if (targetId) {
           const prod = data.find(p => p.id === targetId);
-          if (prod) setProductoActual(prod);
-          setFiltroProducto(targetId);
+          if (prod) {
+            setProductoActual(prod);
+            setFiltroProducto(targetId);
+          }
         }
       } catch (error) {
         console.error('Error al cargar productos:', error);
@@ -110,20 +120,51 @@ const MovimientosProductoPage: React.FC = () => {
       try {
         setIsLoadingMovimientos(true);
 
-        const { movimientos, total } = await obtenerMovimientosFiltradosService(
-          {
-            productoId: filtroProducto === 'todos' ? undefined : filtroProducto || undefined,
-            tipo: filtroTipo === 'todos' ? undefined : filtroTipo as any,
-            orden: filtroOrden,
-            fechaInicio: filtroFecha || undefined,
-            fechaFin: filtroFecha || undefined
-          },
-          currentPage,
-          rowsPerPage
-        );
+        // Determine product name for filter
+        let nombreProductoFilter = 'todos';
+        if (filtroProducto && filtroProducto !== 'todos') {
+          const prod = productos.find(p => p.id === filtroProducto);
+          if (prod) nombreProductoFilter = prod.nombre;
+        }
 
-        setMovimientos(movimientos);
-        setTotalMovimientos(total);
+        const ordenFilter = filtroOrden === 'antiguo' ? 'MAS_ANTIGUOS' : 'MAS_RECIENTES';
+
+        const filterRequest: any = {
+          tipoMovimiento: filtroTipo,
+          orden: ordenFilter,
+          fechaInicio: filtroFecha || undefined,
+          fechaFin: filtroFecha || undefined
+        };
+
+        if (filtroProducto && filtroProducto !== 'todos') {
+          const prod = productos.find(p => p.id === filtroProducto);
+          // Backend filters strict by name.
+          filterRequest.nombreProducto = prod ? prod.nombre : 'todos';
+
+          // Ensure we don't send IDs if we want to rely on name match
+          delete filterRequest.idProducto;
+          delete filterRequest.idInventario;
+        } else {
+          filterRequest.nombreProducto = 'todos';
+        }
+
+        const data = await obtenerMovimientosFiltradosService(filterRequest);
+
+        // Filter: Only show movements for products currently in active inventory
+        const movimientosActivos = data.filter(m => {
+          const mName = m.producto?.nombre || (m as any).nombreProducto;
+          // Also check ID if available for robustness
+          const mId = m.producto?.id || (m as any).idProducto;
+
+          return productos.some(p => {
+            if (mId && p.id === mId.toString()) return true;
+            return p.nombre === mName;
+          });
+        });
+
+        setMovimientos(movimientosActivos);
+        setTotalMovimientos(movimientosActivos.length);
+
       } catch (error) {
         console.error('Error al cargar movimientos:', error);
       } finally {
@@ -132,8 +173,22 @@ const MovimientosProductoPage: React.FC = () => {
       }
     };
 
-    cargarMovimientos();
-  }, [filtroProducto, filtroTipo, filtroOrden, filtroFecha, currentPage]);
+    if (productos.length > 0) {
+      cargarMovimientos();
+    } else if (filtroProducto === 'todos' && productos.length === 0) {
+      // Attempt to load even if products empty if it's 'todos', 
+      // might fail finding name if logic strictly depends on it, but 'todos' is safe.
+      // Better to just wait for products to ensure consistency.
+    }
+  }, [filtroProducto, filtroTipo, filtroOrden, filtroFecha, productos]);
+
+  // Load initial if todos
+  React.useEffect(() => {
+    if (filtroProducto === 'todos' && productos.length === 0) {
+      // Just let the previous effect handle it when products load.
+    }
+  }, []);
+
 
   /**
    * Actualiza el producto actual cuando cambia el filtro de producto
@@ -147,6 +202,12 @@ const MovimientosProductoPage: React.FC = () => {
     }
   }, [filtroProducto, productos]);
 
+  // Client-side pagination logic
+  const paginatedMovimientos = React.useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return movimientos.slice(start, start + rowsPerPage);
+  }, [movimientos, currentPage]);
+
   /**
    * Vuelve a la página de inventario.
    */
@@ -156,9 +217,9 @@ const MovimientosProductoPage: React.FC = () => {
 
   const renderTipoMovimiento = (tipo: string) => {
     switch (tipo) {
-      case 'Entrada': return <Chip color="success" size="sm" variant="flat">Entrada</Chip>;
-      case 'Salida': return <Chip color="primary" size="sm" variant="flat">Salida</Chip>;
-      case 'Merma': return <Chip color="danger" size="sm" variant="flat">Merma</Chip>;
+      case 'ENTRADA': return <Chip color="success" size="sm" variant="flat">Entrada</Chip>;
+      case 'SALIDA': return <Chip color="danger" size="sm" variant="flat">Salida</Chip>;
+      case 'AJUSTE': return <Chip color="warning" size="sm" variant="flat">Ajuste</Chip>;
       default: return <Chip size="sm">{tipo}</Chip>;
     }
   };
@@ -173,7 +234,7 @@ const MovimientosProductoPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4">
+    <div className="container mx-auto px-4 py-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -225,9 +286,9 @@ const MovimientosProductoPage: React.FC = () => {
                 }}
               >
                 <SelectItem key="todos">Todos</SelectItem>
-                <SelectItem key="Entrada">Entrada</SelectItem>
-                <SelectItem key="Salida">Salida</SelectItem>
-                <SelectItem key="Merma">Merma</SelectItem>
+                <SelectItem key="ENTRADA">Entrada</SelectItem>
+                <SelectItem key="SALIDA">Salida</SelectItem>
+                <SelectItem key="AJUSTE">Ajuste</SelectItem>
               </Select>
 
               {/* Filtro Orden */}
@@ -241,8 +302,6 @@ const MovimientosProductoPage: React.FC = () => {
               >
                 <SelectItem key="reciente">Más Recientes</SelectItem>
                 <SelectItem key="antiguo">Más Antiguos</SelectItem>
-                <SelectItem key="cantidad_asc">Menor Cantidad</SelectItem>
-                <SelectItem key="cantidad_desc">Mayor Cantidad</SelectItem>
               </Select>
 
               {/* Filtro Fecha */}
@@ -293,14 +352,16 @@ const MovimientosProductoPage: React.FC = () => {
           aria-label="Tabla de movimientos"
           removeWrapper
           bottomContent={
-            <div className="flex w-full justify-center">
-              <Pagination
-                total={Math.ceil(totalMovimientos / rowsPerPage)}
-                page={currentPage}
-                onChange={setCurrentPage}
-                showControls
-              />
-            </div>
+            totalMovimientos > 0 ? (
+              <div className="flex w-full justify-center">
+                <Pagination
+                  total={Math.ceil(totalMovimientos / rowsPerPage)}
+                  page={currentPage}
+                  onChange={setCurrentPage}
+                  showControls
+                />
+              </div>
+            ) : null
           }
         >
           <TableHeader>
@@ -315,28 +376,34 @@ const MovimientosProductoPage: React.FC = () => {
           <TableBody
             isLoading={isLoadingMovimientos}
             loadingContent="Cargando movimientos..."
-            emptyContent="No se encontraron movimientos para este producto"
+            emptyContent="No se encontraron movimientos"
           >
-            {movimientos.map((movimiento) => (
-              <TableRow key={movimiento.id}>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="text-bold text-sm">{movimiento.productoNombre}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {productos.find(p => p.id === movimiento.productoId)?.categoria || '-'}
-                </TableCell>
-                <TableCell>{renderTipoMovimiento(movimiento.tipo)}</TableCell>
-                <TableCell>{movimiento.cantidad} {
-                  // Intentar buscar la unidad del producto si no está disponible directamente
-                  productos.find(p => p.id === movimiento.productoId)?.unidadMedida || ''
-                }</TableCell>
-                <TableCell>{formatearFecha(movimiento.fechaMovimiento)}</TableCell>
-                <TableCell>{movimiento.responsable}</TableCell>
-                <TableCell>{movimiento.observacion}</TableCell>
-              </TableRow>
-            ))}
+            {paginatedMovimientos.map((movimiento) => {
+              // Helper to handle mixed/flat DTOs safely
+              const m = movimiento as any;
+              const prodName = movimiento.producto?.nombre || m.nombreProducto || 'Producto desconocido';
+              const prodCat = movimiento.producto?.categoria || m.nombreCategoria || '-';
+              const prodUnit = movimiento.producto?.unidadMedida || m.unidadMedida || '';
+              const userName = movimiento.usuario?.nombreCompleto || m.nombreUsuario || m.responsable || 'Sistema';
+
+              return (
+                <TableRow key={movimiento.id}>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-sm">{prodName}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {prodCat}
+                  </TableCell>
+                  <TableCell>{renderTipoMovimiento(movimiento.tipoMovimiento)}</TableCell>
+                  <TableCell>{movimiento.stockMovimiento} {prodUnit}</TableCell>
+                  <TableCell>{formatearFecha(movimiento.fechaMovimiento)}</TableCell>
+                  <TableCell>{userName}</TableCell>
+                  <TableCell>{movimiento.observacion}</TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </motion.div>
@@ -346,10 +413,11 @@ const MovimientosProductoPage: React.FC = () => {
         <ModalContent>
           {(onClose) => (
             <FormularioMovimiento
-              productoId={productoActual?.id || ''}
+              inventarioId={productoActual?._idInventario ?? productoActual?.id ?? ''}
+              userId={user?.id}
               onClose={() => {
                 onClose();
-                // Necesitamos refrescar los movimientos y el producto
+                // Recargar página
                 window.location.reload();
               }}
               unidadMedida={productoActual?.unidadMedida || ''}
@@ -365,19 +433,17 @@ const MovimientosProductoPage: React.FC = () => {
  * Interfaz para las propiedades del componente FormularioMovimiento.
  */
 interface FormularioMovimientoProps {
-  productoId: string;
+  inventarioId: string | number;
+  userId?: string | number;
   onClose: () => void;
   unidadMedida: string;
 }
 
 /**
  * Componente de formulario para crear un nuevo movimiento.
- * 
- * @param {FormularioMovimientoProps} props - Propiedades del componente.
- * @returns {JSX.Element} El formulario de movimiento.
  */
-const FormularioMovimiento: React.FC<FormularioMovimientoProps> = ({ productoId, onClose, unidadMedida }) => {
-  const [tipo, setTipo] = React.useState<'Entrada' | 'Salida' | 'Merma'>('Entrada');
+const FormularioMovimiento: React.FC<FormularioMovimientoProps> = ({ inventarioId, userId, onClose, unidadMedida }) => {
+  const [tipo, setTipo] = React.useState<TipoMovimiento>('ENTRADA');
   const [cantidad, setCantidad] = React.useState<string>('');
   const [observacion, setObservacion] = React.useState<string>('');
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
@@ -386,21 +452,25 @@ const FormularioMovimiento: React.FC<FormularioMovimientoProps> = ({ productoId,
    * Maneja el envío del formulario.
    */
   const handleSubmit = async () => {
-    if (!cantidad || parseInt(cantidad) <= 0) {
+    if (!cantidad || parseFloat(cantidad) <= 0) {
       alert('La cantidad debe ser mayor a 0');
+      return;
+    }
+    if (!userId) {
+      alert('Error: Usuario no identificado');
       return;
     }
 
     try {
       setIsLoading(true);
       await crearMovimientoService({
-        productoId,
-        tipo,
-        cantidad: parseInt(cantidad),
+        idUsuario: userId,
+        idInventario: inventarioId,
+        stockMovimiento: parseFloat(cantidad),
+        tipoMovimiento: tipo,
         observacion
       });
       onClose();
-      // En una implementación real, aquí se actualizaría la lista de movimientos
     } catch (error) {
       console.error('Error al crear el movimiento:', error);
       alert('Error al crear el movimiento');
@@ -417,11 +487,11 @@ const FormularioMovimiento: React.FC<FormularioMovimientoProps> = ({ productoId,
           <Select
             label="Tipo de Movimiento"
             selectedKeys={[tipo]}
-            onChange={(e) => setTipo(e.target.value as 'Entrada' | 'Salida' | 'Merma')}
+            onChange={(e) => setTipo(e.target.value as TipoMovimiento)}
           >
-            <SelectItem key="Entrada">Entrada</SelectItem>
-            <SelectItem key="Salida">Salida</SelectItem>
-            <SelectItem key="Merma">Merma</SelectItem>
+            <SelectItem key="ENTRADA">Entrada</SelectItem>
+            <SelectItem key="SALIDA">Salida</SelectItem>
+            <SelectItem key="AJUSTE">Ajuste</SelectItem>
           </Select>
 
           <Input
@@ -430,7 +500,8 @@ const FormularioMovimiento: React.FC<FormularioMovimientoProps> = ({ productoId,
             placeholder="Ingrese la cantidad"
             value={cantidad}
             onValueChange={setCantidad}
-            min="1"
+            min="0.01"
+            step="0.01"
             endContent={<span className="text-default-400">{unidadMedida}</span>}
           />
 

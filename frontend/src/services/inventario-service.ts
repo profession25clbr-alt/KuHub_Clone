@@ -200,29 +200,36 @@ export const actualizarProductoService = async (productoData: IActualizarProduct
     }
 
     try {
-        // Primero obtener el producto actual para tener idInventario y todos los datos
-        const productoActual = await obtenerProductoPorIdService(productoData.id);
+        let idInventario = productoData.idInventario;
+        let productoActual: IProducto | null = null;
 
-        // Convertir el ID a número
+        // Convertir el ID a número (ID del producto)
         const idProductoNumerico = parseInt(productoData.id);
 
-        // Obtener el idInventario del producto (viene como propiedad interna)
-        const idInventario = (productoActual as any)._idInventario;
-
         if (!idInventario) {
-            throw new Error('No se pudo obtener el ID de inventario del producto');
+            // Si no nos pasaron el ID de inventario, tenemos que buscarlo
+            console.log('⚠️ idInventario no proporcionado, recuperando del backend...');
+            productoActual = await obtenerProductoPorIdService(productoData.id);
+            idInventario = (productoActual as any)._idInventario;
+
+            if (!idInventario) {
+                throw new Error('No se pudo obtener el ID de inventario del producto');
+            }
         }
 
-        // Transformar al formato del backend (merge con datos actuales)
+        // Transformar al formato del backend
+        // Si tenemos productoActual, usamos sus datos como fallback.
+        // Si no (porque pasaron idInventario), usamos strings vacíos o ceros como fallback final
+        // asumiendo que el frontend envía todos los datos en la edición.
         const backendDTO: BackendActualizarInventarioDTO = {
-            idInventario: idInventario, // ✅ Usar el idInventario real del producto
+            idInventario: idInventario!,
             idProducto: idProductoNumerico,
-            nombreProducto: productoData.nombre?.trim() || productoActual.nombre,
-            descripcionProducto: productoData.descripcion?.trim() || productoActual.descripcion,
-            nombreCategoria: productoData.categoria?.trim() || productoActual.categoria,
-            unidadMedida: productoData.unidadMedida?.trim() || productoActual.unidadMedida,
-            stock: productoData.stock ?? productoActual.stock,
-            stockLimitMin: productoData.stockMinimo ?? productoActual.stockMinimo,
+            nombreProducto: productoData.nombre?.trim() || productoActual?.nombre || '',
+            descripcionProducto: productoData.descripcion?.trim() || productoActual?.descripcion || '',
+            nombreCategoria: productoData.categoria?.trim() || productoActual?.categoria || '',
+            unidadMedida: productoData.unidadMedida?.trim() || productoActual?.unidadMedida || '',
+            stock: productoData.stock ?? productoActual?.stock ?? 0,
+            stockLimitMin: productoData.stockMinimo ?? productoActual?.stockMinimo ?? 0,
         };
 
         const response = await api.put<BackendActualizarInventarioDTO>(
