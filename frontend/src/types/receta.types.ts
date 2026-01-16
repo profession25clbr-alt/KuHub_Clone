@@ -15,7 +15,16 @@ export interface IItemReceta {
   nombreProducto: string;
   unidadMedida: string;
   cantUnidadMedida: number;
-  activo: boolean;
+  activo: boolean; // Utilizado para saber si el item está habilitado o mostrar INDISPONIBLE
+}
+
+/**
+ * Interfaz para el producto simplificado para usar en recetas.
+ */
+export interface IProductoParaReceta {
+  idProducto: number;
+  nombreProducto: string;
+  unidadMedida: string;
 }
 
 /**
@@ -36,13 +45,45 @@ export interface IReceta {
  * Interfaz para crear/actualizar una receta (Frontend -> Backend).
  * Nota: Adaptada para coincidir con lo que esperaría el backend o para uso interno temporal.
  */
+
+/**
+ * Payload para crear una nueva receta.
+ * POST /api/v1/receta/create-recipe-with-details/
+ */
+export interface ICrearRecetaPayload {
+  nombreReceta: string;
+  descripcionReceta: string;
+  instrucciones: string;
+  estadoReceta: 'ACTIVO' | 'INACTIVO';
+  listaItems: IItemReceta[];
+}
+
+/**
+ * Payload para actualizar una receta con lógica de diferencias.
+ * PUT /api/v1/receta/update-recipe-with-details/
+ */
+export interface IActualizarRecetaPayload {
+  idReceta: number;
+  cambioReceta: boolean;
+  nombreReceta: string;
+  descripcionReceta: string;
+  instrucciones: string;
+  estadoReceta: 'ACTIVO' | 'INACTIVO';
+  itemsAgregados: IItemReceta[];
+  itemsModificados: IItemReceta[];
+  idsItemsEliminados: number[]; // Lista de IDs de los productos/items eliminados
+}
+
+/**
+ * Interfaz unificada para el formulario de receta (Frontend).
+ */
 export interface IGuardarReceta {
   idReceta?: number;
   nombreReceta: string;
   descripcionReceta: string;
-  listaItems: IItemReceta[];
   instrucciones: string;
   estadoReceta: 'ACTIVO' | 'INACTIVO';
+  listaItems: IItemReceta[];
 }
 
 /**

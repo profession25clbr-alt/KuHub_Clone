@@ -22,11 +22,11 @@ export interface CreateMovimientoRequest {
 }
 
 export interface MovimientoFilterRequest {
-    nombreProducto: string;
-    tipoMovimiento: string; // 'todos' | TipoMovimiento
-    orden: 'MAS_RECIENTES' | 'MAS_ANTIGUOS';
+    nombreProducto: string; // "todos" o nombre
+    tipoMovimiento: string | null; // "todos" si es null, o el valor
+    orden: 'MAS_RECIENTES' | 'MAS_ANTIGUOS' | null; // Default MAS_RECIENTES
     idProducto?: string | number;
     idInventario?: string | number;
-    fechaInicio?: string;
-    fechaFin?: string;
+    fechaInicio?: string | null;
+    fechaFin?: string | null;
 }

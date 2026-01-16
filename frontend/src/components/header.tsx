@@ -51,13 +51,13 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
           aria-label="Toggle Sidebar"
           onPress={toggleSidebar}
         >
-            <DropdownItem key="profile" onPress={goToProfile}>
-                <div className="flex items-center gap-2">
-                    {/* Cambia el icono por el logo */}
-                    <img src={LOGO_URL} alt="Logo KuHub" className="h-5 w-5 rounded" />
-                    <span>Perfil</span>
-                </div>
-            </DropdownItem>
+          <DropdownItem key="profile" onPress={goToProfile}>
+            <div className="flex items-center gap-2">
+              {/* Cambia el icono por el logo */}
+              <img src={LOGO_URL} alt="Logo KuHub" className="h-5 w-5 rounded" />
+              <span>Perfil</span>
+            </div>
+          </DropdownItem>
         </Button>
 
         {/* Título de la página (visible solo en móviles) */}
@@ -75,8 +75,8 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
             aria-label="Toggle Theme"
             onPress={toggleTheme}
           >
-            <Icon 
-              icon={theme === 'light' ? 'lucide:moon' : 'lucide:sun'} 
+            <Icon
+              icon={theme === 'light' ? 'lucide:moon' : 'lucide:sun'}
               className="text-lg"
             />
           </Button>
@@ -92,7 +92,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                   <Avatar
                     name={user.nombre}
                     size="sm"
-                    src={user.avatar || undefined}
+                    src={user.fotoPerfil || undefined}
                   />
                   <span className="hidden md:inline text-sm font-medium">
                     {user.nombre}

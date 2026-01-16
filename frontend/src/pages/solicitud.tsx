@@ -17,7 +17,9 @@ import { obtenerRecetasActivasService } from '../services/receta-service';
 import { obtenerProductosService } from '../services/producto-service';
 import { crearSolicitudService, obtenerMisSolicitudesService } from '../services/solicitud-service';
 import { obtenerAsignaturasService } from '../services/asignatura-service';
+import { obtenerSemanasActivasService } from '../services/semana-service';
 import { ISolicitud, EstadoSolicitud } from '../types/solicitud.types';
+import { ISemana } from '../types/semana.types';
 
 const getFirstSelectionValue = (keys: any): string | undefined => {
   if (!keys || keys === 'all') return undefined;
@@ -30,6 +32,7 @@ const SolicitudPage: React.FC = () => {
   const [recetasDisponibles, setRecetasDisponibles] = React.useState<IReceta[]>([]);
   const [productos, setProductos] = React.useState<IProducto[]>([]);
   const [asignaturas, setAsignaturas] = React.useState<IAsignatura[]>([]);
+  const [semanasActivas, setSemanasActivas] = React.useState<ISemana[]>([]);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
 
   const [asignaturaId, setAsignaturaId] = React.useState<string>('');
@@ -75,18 +78,20 @@ const SolicitudPage: React.FC = () => {
     }
   }, []);
 
-  // Cargar recetas, productos, asignaturas e historial al montar
+  // Cargar recetas, productos, asignaturas, semanas e historial al montar
   const cargarDatos = React.useCallback(async () => {
     try {
       setIsLoading(true);
-      const [recetas, productosData, asignaturasData] = await Promise.all([
+      const [recetas, productosData, asignaturasData, semanasData] = await Promise.all([
         obtenerRecetasActivasService(),
         obtenerProductosService(),
-        obtenerAsignaturasService()
+        obtenerAsignaturasService(),
+        obtenerSemanasActivasService()
       ]);
       setRecetasDisponibles(recetas);
       setProductos(productosData);
       setAsignaturas(asignaturasData);
+      setSemanasActivas(semanasData);
       await cargarHistorial();
     } catch (error) {
       logger.error('Error al cargar datos:', error);
@@ -116,13 +121,13 @@ const SolicitudPage: React.FC = () => {
 
         // Si hay una receta cargada, recalcular las cantidades
         if (recetaCargada) {
-          const recetaSeleccionada = recetasDisponibles.find(r => r.id === recetaCargada.id);
+          const recetaSeleccionada = recetasDisponibles.find(r => r.idReceta.toString() === recetaCargada.id);
           if (recetaSeleccionada) {
-            const nuevosItems: IItemSolicitud[] = recetaSeleccionada.ingredientes.map(ing => ({
-              id: `${recetaCargada.id}-${ing.id}-${Date.now()}`,
-              productoId: ing.productoId,
-              productoNombre: ing.productoNombre,
-              cantidad: ing.cantidad * multiplicador,
+            const nuevosItems: IItemSolicitud[] = recetaSeleccionada.listaItems.map((ing, index) => ({
+              id: `${recetaCargada.id}-${ing.idProducto}-${Date.now()}-${index}`,
+              productoId: ing.idProducto.toString(),
+              productoNombre: ing.nombreProducto,
+              cantidad: ing.cantUnidadMedida * multiplicador,
               unidadMedida: ing.unidadMedida,
               esAdicional: false
             }));
@@ -138,19 +143,19 @@ const SolicitudPage: React.FC = () => {
   const handleSeleccionarReceta = (recetaId: string) => {
     if (!recetaId) return;
 
-    const recetaSeleccionada = recetasDisponibles.find(r => r.id === recetaId);
+    const recetaSeleccionada = recetasDisponibles.find(r => r.idReceta.toString() === recetaId);
     if (!recetaSeleccionada) return;
 
-    setRecetaCargada({ id: recetaSeleccionada.id, nombre: recetaSeleccionada.nombre });
+    setRecetaCargada({ id: recetaSeleccionada.idReceta.toString(), nombre: recetaSeleccionada.nombreReceta });
     setEsCustom(false);
 
     // Convertir ingredientes de receta a items de solicitud
     // Multiplicar por el multiplicador actual (basado en alumnos de la asignatura)
-    const nuevosItems: IItemSolicitud[] = recetaSeleccionada.ingredientes.map(ing => ({
-      id: `${recetaId}-${ing.id}-${Date.now()}`,
-      productoId: ing.productoId,
-      productoNombre: ing.productoNombre,
-      cantidad: ing.cantidad * multiplicadorReceta,
+    const nuevosItems: IItemSolicitud[] = recetaSeleccionada.listaItems.map((ing, index) => ({
+      id: `${recetaId}-${ing.idProducto}-${Date.now()}-${index}`,
+      productoId: ing.idProducto.toString(),
+      productoNombre: ing.nombreProducto,
+      cantidad: ing.cantUnidadMedida * multiplicadorReceta,
       unidadMedida: ing.unidadMedida,
       esAdicional: false // Viene de la receta
     }));
@@ -239,9 +244,9 @@ const SolicitudPage: React.FC = () => {
     }
 
     // 3. Set Items (and regenerate IDs to avoid conflicts if needed, though usually fine)
-    const nuevosItems = solicitud.items.map(item => ({
+    const nuevosItems = solicitud.items.map((item, index) => ({
       ...item,
-      id: Date.now() + Math.random().toString(36).substr(2, 9) // New IDs for the new draft
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}` // New IDs for the new draft unique
     }));
     setItems(nuevosItems);
 
@@ -366,7 +371,7 @@ const SolicitudPage: React.FC = () => {
 
                 <Select
                   label="Semana académica"
-                  placeholder="Seleccione la semana (1 - 18)"
+                  placeholder="Seleccione la semana"
                   selectedKeys={semanaSelectedKeys}
                   onSelectionChange={(keys) => {
                     const selected = getFirstSelectionValue(keys);
@@ -374,11 +379,10 @@ const SolicitudPage: React.FC = () => {
                   }}
                   isRequired
                 >
-                  {Array.from({ length: 18 }, (_, index) => {
-                    const semanaValor = (index + 1).toString();
-                    const label = `Semana ${semanaValor}`;
+                  {semanasActivas.map((sem) => {
+                    const label = `Semana ${sem.numeroSemana} (${new Date(sem.fechaInicio).toLocaleDateString()} - ${new Date(sem.fechaFin).toLocaleDateString()})`;
                     return (
-                      <SelectItem key={semanaValor} textValue={label}>
+                      <SelectItem key={sem.numeroSemana.toString()} textValue={`Semana ${sem.numeroSemana}`}>
                         {label}
                       </SelectItem>
                     );
@@ -407,8 +411,8 @@ const SolicitudPage: React.FC = () => {
                   description={!asignaturaId ? "Primero seleccione una asignatura" : "Las cantidades se multiplicarán automáticamente según el total de alumnos"}
                 >
                   {recetasDisponibles.map((receta) => (
-                    <SelectItem key={receta.id} textValue={receta.nombre}>
-                      {receta.nombre}
+                    <SelectItem key={receta.idReceta} textValue={receta.nombreReceta}>
+                      {receta.nombreReceta}
                     </SelectItem>
                   ))}
                 </Select>

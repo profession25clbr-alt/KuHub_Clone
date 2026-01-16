@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  Card, 
-  CardBody, 
-  CardHeader, 
-  Input, 
-  Button, 
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Input,
+  Button,
   Avatar,
   Divider,
   Tabs,
@@ -66,8 +66,8 @@ const PerfilUsuarioPage: React.FC = () => {
         <motion.div variants={itemVariants}>
           <Card className="shadow-sm">
             <CardHeader className="pb-0 pt-4 px-4">
-              <Tabs 
-                selectedKey={activeTab} 
+              <Tabs
+                selectedKey={activeTab}
                 onSelectionChange={setActiveTab as any}
                 aria-label="Opciones de perfil"
                 color="primary"
@@ -111,13 +111,14 @@ const InformacionPersonal: React.FC<{ user: any }> = ({ user }) => {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    // Validar que sea una imagen
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor, seleccione un archivo de imagen válido');
+
+    // Validar que sea una imagen permitida (PNG, JPG, JPEG)
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      alert('Solo se permiten archivos PNG, JPG o JPEG');
       return;
     }
-    
+
     try {
       setIsLoading(true);
       const newAvatarUrl = await actualizarFotoPerfilService(file);
@@ -161,7 +162,7 @@ const InformacionPersonal: React.FC<{ user: any }> = ({ user }) => {
             type="file"
             ref={fileInputRef}
             className="hidden"
-            accept="image/*"
+            accept="image/png, image/jpeg, image/jpg"
             onChange={handleFileChange}
           />
         </div>
@@ -189,8 +190,8 @@ const InformacionPersonal: React.FC<{ user: any }> = ({ user }) => {
         <div>
           <p className="text-sm text-default-500 mb-1">Último Acceso</p>
           <p className="font-semibold">
-            {user?.ultimoAcceso 
-              ? new Date(user.ultimoAcceso).toLocaleString('es-CL') 
+            {user?.ultimoAcceso
+              ? new Date(user.ultimoAcceso).toLocaleString('es-CL')
               : "No disponible"}
           </p>
         </div>
@@ -225,7 +226,7 @@ const Seguridad: React.FC = () => {
       ...prev,
       [field]: value
     }));
-    
+
     // Resetear mensajes
     setError(null);
     setSuccess(false);
@@ -238,29 +239,29 @@ const Seguridad: React.FC = () => {
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validaciones
     if (!formData.passwordActual || !formData.passwordNueva || !formData.confirmarPassword) {
       setError('Por favor, complete todos los campos');
       return;
     }
-    
+
     if (formData.passwordNueva !== formData.confirmarPassword) {
       setError('Las contraseñas nuevas no coinciden');
       return;
     }
-    
+
     if (formData.passwordNueva.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
       await cambiarPasswordService(formData);
-      
+
       setSuccess(true);
       setFormData({
         passwordActual: '',
@@ -278,21 +279,21 @@ const Seguridad: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold mb-4">Cambiar Contraseña</h3>
-        
+
         {error && (
           <div className="bg-danger-100 text-danger p-3 rounded-md mb-4 text-sm">
             <Icon icon="lucide:alert-circle" className="inline-block mr-2" />
             {error}
           </div>
         )}
-        
+
         {success && (
           <div className="bg-success-100 text-success p-3 rounded-md mb-4 text-sm">
             <Icon icon="lucide:check-circle" className="inline-block mr-2" />
             Contraseña actualizada correctamente
           </div>
         )}
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             type="password"
@@ -301,7 +302,7 @@ const Seguridad: React.FC = () => {
             value={formData.passwordActual}
             onValueChange={(value) => handleChange('passwordActual', value)}
           />
-          
+
           <Input
             type="password"
             label="Nueva Contraseña"
@@ -309,7 +310,7 @@ const Seguridad: React.FC = () => {
             value={formData.passwordNueva}
             onValueChange={(value) => handleChange('passwordNueva', value)}
           />
-          
+
           <Input
             type="password"
             label="Confirmar Nueva Contraseña"
@@ -317,10 +318,10 @@ const Seguridad: React.FC = () => {
             value={formData.confirmarPassword}
             onValueChange={(value) => handleChange('confirmarPassword', value)}
           />
-          
+
           <div className="pt-2">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               color="primary"
               isLoading={isLoading}
               isDisabled={isLoading}
@@ -330,12 +331,12 @@ const Seguridad: React.FC = () => {
           </div>
         </form>
       </div>
-      
+
       <Divider />
-      
+
       <div>
         <h3 className="text-lg font-semibold mb-4">Seguridad de la Cuenta</h3>
-        
+
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -348,7 +349,7 @@ const Seguridad: React.FC = () => {
               Configurar
             </Button>
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium">Sesiones Activas</p>

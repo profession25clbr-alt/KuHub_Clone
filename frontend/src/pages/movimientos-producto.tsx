@@ -378,7 +378,7 @@ const MovimientosProductoPage: React.FC = () => {
             loadingContent="Cargando movimientos..."
             emptyContent="No se encontraron movimientos"
           >
-            {paginatedMovimientos.map((movimiento) => {
+            {paginatedMovimientos.map((movimiento, index) => {
               // Helper to handle mixed/flat DTOs safely
               const m = movimiento as any;
               const prodName = movimiento.producto?.nombre || m.nombreProducto || 'Producto desconocido';
@@ -386,8 +386,11 @@ const MovimientosProductoPage: React.FC = () => {
               const prodUnit = movimiento.producto?.unidadMedida || m.unidadMedida || '';
               const userName = movimiento.usuario?.nombreCompleto || m.nombreUsuario || m.responsable || 'Sistema';
 
+              // Fallback for key to ensure uniqueness
+              const rowKey = movimiento.id ? `${movimiento.id}` : `mov-${index}`;
+
               return (
-                <TableRow key={movimiento.id}>
+                <TableRow key={rowKey}>
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="font-bold text-sm">{prodName}</span>

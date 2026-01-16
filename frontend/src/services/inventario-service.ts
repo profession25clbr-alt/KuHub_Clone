@@ -51,6 +51,7 @@ interface BackendActualizarInventarioDTO {
     unidadMedida: string;
     stock: number;
     stockLimitMin: number;
+    estadoStock?: string;
 }
 
 /**
@@ -105,16 +106,19 @@ export const obtenerProductoPorIdService = async (id: string): Promise<IProducto
     console.log(`🔍 Buscando producto con ID: ${id}`);
 
     try {
-        // Convertir string a number para el backend
-        const idNumerico = parseInt(id);
+        // ESTRATEGIA FALLBACK ROBUSTA:
+        // Como el endpoint individual `/inventario/id-activo/...` está dando problemas (500 o undefined),
+        // obtenemos todos los productos activos y filtramos localmente. Esto es más seguro.
+        const productos = await obtenerProductosService();
 
-        const response = await api.get<BackendInventarioDTO>(
-            `/inventario/id-activo/${idNumerico}/true`
-        );
+        // Buscamos por ID de producto (string comparison just in case)
+        const producto = productos.find(p => p.id == id);
 
-        const producto = transformarBackendAFrontend(response.data);
+        if (!producto) {
+            throw new Error(`Producto con ID ${id} no encontrado en la lista de activos`);
+        }
 
-        console.log(`✅ Producto encontrado: ${producto.nombre}`);
+        console.log(`✅ Producto encontrado en lista: ${producto.nombre} (idInventario: ${producto._idInventario})`);
         return producto;
 
     } catch (error: any) {
@@ -230,6 +234,7 @@ export const actualizarProductoService = async (productoData: IActualizarProduct
             unidadMedida: productoData.unidadMedida?.trim() || productoActual?.unidadMedida || '',
             stock: productoData.stock ?? productoActual?.stock ?? 0,
             stockLimitMin: productoData.stockMinimo ?? productoActual?.stockMinimo ?? 0,
+            estadoStock: productoData.estadoStock,
         };
 
         const response = await api.put<BackendActualizarInventarioDTO>(
@@ -267,25 +272,15 @@ export const actualizarProductoService = async (productoData: IActualizarProduct
  * Elimina un producto (eliminación lógica)
  */
 export const eliminarProductoService = async (id: string): Promise<boolean> => {
-    console.log(`🗑️ Eliminando producto ID: ${id}`);
+    console.log(`🗑️ Eliminando producto (soft-delete) ID: ${id}`);
 
     try {
-        // Primero obtener el producto para conseguir el idInventario
-        const producto = await obtenerProductoPorIdService(id);
+        // El backend espera el ID numérico
+        const idNumerico = parseInt(id);
 
-        // Obtener el idInventario del producto
-        const idInventario = (producto as any)._idInventario;
+        await api.put(`/producto/soft-delete/id/${idNumerico}`);
 
-        if (!idInventario) {
-            throw new Error('No se pudo obtener el ID de inventario del producto');
-        }
-
-        // Usar el idInventario para eliminar
-        await api.put(
-            `/inventario/update-active-value-product-false/${idInventario}`
-        );
-
-        console.log('✅ Producto eliminado (desactivado) exitosamente');
+        console.log('✅ Producto eliminado (soft-delete) exitosamente');
         return true;
 
     } catch (error: any) {

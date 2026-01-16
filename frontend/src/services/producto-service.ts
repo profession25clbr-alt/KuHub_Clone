@@ -16,18 +16,18 @@ import {
 // Importar el servicio real de inventario
 import {
   obtenerProductosService as obtenerProductosBackend,
+  eliminarProductoService as eliminarProductoBackend,
   obtenerProductoPorIdService as obtenerProductoPorIdBackend,
   crearProductoService as crearProductoBackend,
   actualizarProductoService as actualizarProductoBackend,
-  eliminarProductoService as eliminarProductoBackend,
 } from './inventario-service';
 
-// Importar funciones locales solo para movimientos (hardcoded)
+// Importar servicio real de movimientos
 import {
-  obtenerMovimientosPorProducto,
-  crearMovimiento,
-  obtenerMovimientos, // ✅ Importamos esto para el filtro general
-} from './storage-service';
+  crearMovimientoService as crearMovimientoBackend,
+  obtenerMovimientosFiltradosService as obtenerMovimientosBackend
+} from './movimiento-service';
+import { CreateMovimientoRequest, MovimientoFilterRequest, IMovimiento } from '../types/movimiento.types';
 
 import { obtenerUsuarioActualService } from './auth-service';
 
@@ -86,77 +86,60 @@ export interface IFiltrosMovimiento {
 /**
  * Obtiene los movimientos filtrados y paginados (LOCAL - HARDCODED)
  */
+// ⚠️ CAMBIO: Usamos el servicio real conectado al backend
+
 export const obtenerMovimientosFiltradosService = async (
   filtros: IFiltrosMovimiento,
   pagina: number = 1,
   limite: number = 10
 ): Promise<{ movimientos: IMovimientoProducto[], total: number }> => {
-  console.log(`📋 Obteniendo movimientos filtrados`, filtros);
+  console.log(`📋 Obteniendo movimientos filtrados (BACKEND)`, filtros);
 
-  // Simulamos un tiempo de respuesta
-  await new Promise(resolve => setTimeout(resolve, 400));
+  try {
+    // Mapear filtros del frontend al request del backend
+    const filterRequest: MovimientoFilterRequest = {
+      nombreProducto: 'todos', // Por defecto 'todos' según requerimiento si no se especifica
+      tipoMovimiento: filtros.tipo || null, // null es 'todos'
+      orden: filtros.orden === 'antiguo' ? 'MAS_ANTIGUOS' : 'MAS_RECIENTES',
+      fechaInicio: filtros.fechaInicio || null,
+      fechaFin: filtros.fechaFin || null,
+      idProducto: filtros.productoId === 'todos' ? undefined : filtros.productoId
+    };
 
-  // 1. Obtener todos los movimientos (sin filtrar)
-  // Nota: Importamos obtenerMovimientos de storage-service (necesitamos agregarlo a los imports)
-  const todosLosMovimientos = obtenerMovimientos();
+    // Llamada al backend
+    const movimientosBackend = await obtenerMovimientosBackend(filterRequest);
 
-  // 2. Aplicar filtros
-  let movimientosFiltrados = [...todosLosMovimientos];
+    // Mapear respuesta del backend (IMovimiento) al formato del frontend (IMovimientoProducto)
+    // Nota: Esto asume que el backend devuelve todos los resultados y paginamos localmente
+    // O idealmente el backend soportaría paginación. Por ahora simulamos paginación sobre el resultado total.
 
-  // Filtro por Producto
-  if (filtros.productoId && filtros.productoId !== 'todos') {
-    movimientosFiltrados = movimientosFiltrados.filter(m => m.productoId === filtros.productoId);
+    // Transformar datos
+    const movimientosTransformados: IMovimientoProducto[] = movimientosBackend.map((m: IMovimiento) => ({
+      id: m.id.toString(),
+      productoId: m.producto.id, // Asumiendo estructura de IProducto
+      productoNombre: m.producto.nombre,
+      tipo: m.tipoMovimiento === 'ENTRADA' ? 'Entrada' : m.tipoMovimiento === 'SALIDA' ? 'Salida' : 'Merma', // Ajustar enum según respuesta
+      cantidad: m.stockMovimiento,
+      fechaMovimiento: m.fechaMovimiento,
+      responsable: m.usuario?.nombreCompleto || 'Sistema',
+      observacion: m.observacion
+    }));
+
+    const total = movimientosTransformados.length;
+    const inicio = (pagina - 1) * limite;
+    const fin = inicio + limite;
+    const movimientosPaginados = movimientosTransformados.slice(inicio, fin);
+
+    return {
+      movimientos: movimientosPaginados,
+      total
+    };
+
+  } catch (error) {
+    console.error('❌ Error al obtener movimientos:', error);
+    // Fallback silencioso o throw según preferencia.
+    return { movimientos: [], total: 0 };
   }
-
-  // Filtro por Tipo
-  if (filtros.tipo) {
-    movimientosFiltrados = movimientosFiltrados.filter(m => m.tipo === filtros.tipo);
-  }
-
-  // Filtro por Fechas
-  if (filtros.fechaInicio) {
-    const inicio = new Date(filtros.fechaInicio).getTime();
-    movimientosFiltrados = movimientosFiltrados.filter(m => new Date(m.fechaMovimiento).getTime() >= inicio);
-  }
-  if (filtros.fechaFin) {
-    const fin = new Date(filtros.fechaFin).getTime();
-    // Ajustar fin al final del día
-    const fechaFin = new Date(filtros.fechaFin);
-    fechaFin.setHours(23, 59, 59, 999);
-    const finMs = fechaFin.getTime();
-    movimientosFiltrados = movimientosFiltrados.filter(m => new Date(m.fechaMovimiento).getTime() <= finMs);
-  }
-
-  // 3. Ordenamiento
-  movimientosFiltrados.sort((a, b) => {
-    const fechaA = new Date(a.fechaMovimiento).getTime();
-    const fechaB = new Date(b.fechaMovimiento).getTime();
-
-    switch (filtros.orden) {
-      case 'reciente':
-        return fechaB - fechaA;
-      case 'antiguo':
-        return fechaA - fechaB;
-      case 'cantidad_asc':
-        return a.cantidad - b.cantidad;
-      case 'cantidad_desc':
-        return b.cantidad - a.cantidad;
-      default:
-        return fechaB - fechaA; // Default: más reciente primero
-    }
-  });
-
-  // 4. Paginación
-  const total = movimientosFiltrados.length;
-  const inicio = (pagina - 1) * limite;
-  const fin = inicio + limite;
-
-  const movimientosPaginados = movimientosFiltrados.slice(inicio, fin);
-
-  return {
-    movimientos: movimientosPaginados,
-    total
-  };
 };
 
 /**
@@ -177,42 +160,51 @@ export const obtenerMovimientosProductoService = async (
 /**
  * Crea un nuevo movimiento de producto (LOCAL - HARDCODED)
  */
+// ⚠️ CAMBIO: Usamos el servicio real conectado al backend
+
 export const crearMovimientoService = async (movimientoData: ICrearMovimiento): Promise<IMovimientoProducto> => {
-  console.log("📝 Creando movimiento (LOCAL):", movimientoData.tipo, movimientoData.cantidad);
-
-  // Validaciones
-  if (movimientoData.cantidad <= 0) {
-    throw new Error('La cantidad debe ser mayor a 0');
-  }
-
-  if (!movimientoData.observacion || movimientoData.observacion.trim() === '') {
-    throw new Error('La observación es requerida');
-  }
+  console.log("📝 Creando movimiento (BACKEND):", movimientoData.tipo, movimientoData.cantidad);
 
   // Obtener usuario actual
   const usuario = obtenerUsuarioActualService();
-  const responsable = usuario ? usuario.nombreCompleto : 'Sistema';
+  if (!usuario) throw new Error("Usuario no autenticado");
 
-  // Simulamos un tiempo de respuesta
-  await new Promise(resolve => setTimeout(resolve, 600));
+  // Primero necesitamos obtener el ID de inventario del producto
+  // Usamos el servicio de producto para esto, asumiendo que podemos obtener el producto por ID
+  // O el frontend ya debería tener el ID de inventario.
+  // Dado que ICrearMovimiento solo tiene productoId, necesitamos resolver idInventario.
+
+  // Opción 1: Obtener producto para sacar idInventario
+  const producto = await obtenerProductoPorIdBackend(movimientoData.productoId);
+  const idInventario = (producto as any)._idInventario;
+
+  if (!idInventario) throw new Error("No se pudo obtener el ID de Inventario para el producto");
 
   try {
-    // Preparar los datos del movimiento sin el responsable
-    const movimientoParaGuardar = {
-      productoId: movimientoData.productoId,
-      tipo: movimientoData.tipo,
-      cantidad: movimientoData.cantidad,
-      observacion: movimientoData.observacion,
+    const request: CreateMovimientoRequest = {
+      idUsuario: usuario.id,
+      idInventario: idInventario,
+      stockMovimiento: movimientoData.cantidad,
+      tipoMovimiento: movimientoData.tipo === 'Entrada' ? 'ENTRADA' : movimientoData.tipo === 'Salida' ? 'SALIDA' : 'AJUSTE', // Mapear tipos
+      observacion: movimientoData.observacion
     };
 
-    const nuevoMovimiento = crearMovimiento(movimientoParaGuardar, responsable);
+    const nuevoMovimiento = await crearMovimientoBackend(request);
 
-    if (!nuevoMovimiento) {
-      throw new Error('Error al crear el movimiento');
-    }
+    console.log(`✅ Movimiento creado en backend: ID ${nuevoMovimiento.id}`);
 
-    console.log(`✅ Movimiento creado: ${movimientoData.tipo} de ${movimientoData.cantidad} unidades`);
-    return nuevoMovimiento;
+    // Adaptar respuesta al formato del frontend
+    return {
+      id: nuevoMovimiento.id.toString(),
+      productoId: nuevoMovimiento.producto.id,
+      productoNombre: nuevoMovimiento.producto.nombre,
+      tipo: movimientoData.tipo,
+      cantidad: nuevoMovimiento.stockMovimiento,
+      fechaMovimiento: nuevoMovimiento.fechaMovimiento,
+      responsable: nuevoMovimiento.usuario?.nombreCompleto || usuario.nombreCompleto,
+      observacion: nuevoMovimiento.observacion
+    };
+
   } catch (error) {
     console.error('❌ Error al crear movimiento:', error);
     throw error;

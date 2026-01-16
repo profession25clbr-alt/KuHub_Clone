@@ -142,8 +142,8 @@ export const crearUsuarioService = async (data: IUsuarioCreacion): Promise<IUsua
  * Actualizar usuario - BACKEND
  */
 export const actualizarUsuarioService = async (
-    id: string,
-    data: IUsuarioActualizacion
+  id: string,
+  data: IUsuarioActualizacion
 ): Promise<IUsuario> => {
   try {
     console.log('📡 Actualizando usuario en backend:', id);
@@ -244,13 +244,19 @@ export const subirFotoPerfilService = (archivo: File): Promise<string> => {
  * Función helper para convertir usuario del backend al formato frontend
  */
 function convertirUsuarioBackendAFrontend(usuarioBackend: any): IUsuario {
+  let fotoPerfil = usuarioBackend.fotoPerfil;
+  // Asegurar prefijo para evitar error 431
+  if (fotoPerfil && !fotoPerfil.startsWith('http') && !fotoPerfil.startsWith('data:')) {
+    fotoPerfil = `data:image/jpeg;base64,${fotoPerfil}`;
+  }
+
   return {
     id: usuarioBackend.idUsuario.toString(),
     nombreCompleto: usuarioBackend.nombreCompleto,
     correo: usuarioBackend.email,
     contrasena: '', // No devolver contraseña
     rol: usuarioBackend.nombreRol,
-    fotoPerfil: usuarioBackend.fotoPerfil,
+    fotoPerfil: fotoPerfil,
     activo: usuarioBackend.activo,
     fechaCreacion: usuarioBackend.fechaCreacion,
     ultimoAcceso: usuarioBackend.ultimoAcceso

@@ -137,18 +137,62 @@ const GestionRecetasPage: React.FC = () => {
     try {
       if (modalMode === 'crear') {
         console.log('📝 Creando nueva receta:', recetaData.nombreReceta);
-        await crearRecetaService(recetaData);
-        toast.success('Receta creada correctamente (Simulado)');
-      } else if (modalMode === 'editar') {
+
+        // Mapear IGuardarReceta a ICrearRecetaPayload
+        const payload: any = {
+          nombreReceta: recetaData.nombreReceta,
+          descripcionReceta: recetaData.descripcionReceta,
+          instrucciones: recetaData.instrucciones,
+          estadoReceta: recetaData.estadoReceta,
+          listaItems: recetaData.listaItems
+        };
+
+        await crearRecetaService(payload);
+        toast.success('Receta creada correctamente');
+      } else if (modalMode === 'editar' && recetaSeleccionada) {
         console.log('✏️ Actualizando receta:', recetaData.nombreReceta);
-        await actualizarRecetaService(recetaData);
-        toast.success('Receta actualizada correctamente (Simulado)');
+
+        // Lógica de diferencias para IActualizarRecetaPayload
+        const itemsOriginales = recetaSeleccionada.listaItems || [];
+        const itemsNuevos = recetaData.listaItems || [];
+
+        // 1. Items Agregados
+        const itemsAgregados = itemsNuevos.filter(nuevo =>
+          !itemsOriginales.some(orig => orig.idProducto === nuevo.idProducto)
+        );
+
+        // 2. Items Modificados
+        const itemsModificados = itemsNuevos.filter(nuevo => {
+          const original = itemsOriginales.find(orig => orig.idProducto === nuevo.idProducto);
+          if (!original) return false;
+          return original.cantUnidadMedida !== nuevo.cantUnidadMedida;
+        });
+
+        // 3. IDs Items Eliminados
+        const idsItemsEliminados = itemsOriginales
+          .filter(orig => !itemsNuevos.some(nuevo => nuevo.idProducto === orig.idProducto))
+          .map(orig => orig.idProducto);
+
+        // Construir payload
+        const payload: any = {
+          idReceta: recetaSeleccionada.idReceta,
+          cambioReceta: true,
+          nombreReceta: recetaData.nombreReceta,
+          descripcionReceta: recetaData.descripcionReceta,
+          instrucciones: recetaData.instrucciones,
+          estadoReceta: recetaData.estadoReceta,
+          itemsAgregados: itemsAgregados,
+          itemsModificados: itemsModificados,
+          idsItemsEliminados: idsItemsEliminados
+        };
+
+        await actualizarRecetaService(payload);
+        toast.success('Receta actualizada correctamente');
       }
       await cargarDatos();
     } catch (error: any) {
       console.error('❌ Error al guardar receta:', error);
       toast.error(error.message || 'Error al guardar la receta');
-      throw error;
     }
   };
 

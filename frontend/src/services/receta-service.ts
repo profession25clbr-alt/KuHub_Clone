@@ -7,7 +7,9 @@
 import axios from '../config/Axios';
 import {
   IReceta,
-  IGuardarReceta,
+  ICrearRecetaPayload,
+  IActualizarRecetaPayload,
+  IProductoParaReceta,
 } from '../types/receta.types';
 
 /**
@@ -16,10 +18,25 @@ import {
  */
 export const obtenerRecetasService = async (): Promise<IReceta[]> => {
   try {
-    const response = await axios.get<IReceta[]>('/receta/find-all-recipe-with-details-active');
+    const response = await axios.get<IReceta[]>('/receta/find-all-recipe-with-details-active/');
     return response.data;
   } catch (error) {
     console.error('Error al obtener recetas:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene los productos disponibles para usar en recetas.
+ * Endpoint: GET /api/v1/producto/find-all-product-active-for-recipe
+ */
+export const obtenerProductosParaRecetaService = async (): Promise<IProductoParaReceta[]> => {
+  try {
+    const response = await axios.get<IProductoParaReceta[]>('/producto/find-all-product-active-for-recipe');
+    console.log('📦 Productos para receta obtenidos:', response.data.length);
+    return response.data;
+  } catch (error) {
+    console.error('Error al obtener productos para receta:', error);
     throw error;
   }
 };
@@ -67,34 +84,40 @@ export const obtenerRecetaPorIdService = async (id: number): Promise<IReceta> =>
 };
 
 
-// --- MÉTODOS MOCK / NO IMPLEMENTADOS EN BACKEND AÚN ---
-
 /**
- * Crea una nueva receta.
- * MOCK: No hay endpoint proporcionado.
+ * Crea una nueva receta enviando el payload completo.
+ * Endpoint: POST /api/v1/receta/create-recipe-with-details/
  */
-export const crearRecetaService = async (recetaData: IGuardarReceta): Promise<IReceta> => {
-  console.warn('Endpoint de crear receta no implementado. MOCK activo.');
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return {
-    ...recetaData,
-    idReceta: Math.floor(Math.random() * 10000),
-    cambioReceta: false,
-    cambioDetalles: false
-  } as IReceta;
+export const crearRecetaService = async (recetaData: ICrearRecetaPayload): Promise<IReceta> => {
+  console.log('➕ Creando receta con detalle:', recetaData);
+  try {
+    const response = await axios.post<IReceta>('/receta/create-recipe-with-details/', recetaData);
+    console.log(`✅ Receta creada ID: ${response.data.idReceta}`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error al crear receta:', error);
+    throw error;
+  }
 };
 
 /**
- * Actualiza una receta existente.
- * MOCK: No hay endpoint proporcionado para editar contenido.
+ * Actualiza una receta enviando las diferencias (agregados, modificados, eliminados).
+ * Endpoint: PUT /api/v1/receta/update-recipe-with-details/
  */
-export const actualizarRecetaService = async (recetaData: IGuardarReceta): Promise<IReceta> => {
-  console.warn('Endpoint de actualizar receta no implementado. MOCK activo.');
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return {
-    ...recetaData,
-    cambioReceta: true
-  } as IReceta;
+export const actualizarRecetaService = async (payload: IActualizarRecetaPayload): Promise<IReceta> => {
+  console.log('✏️ Actualizando receta con diferencias:', payload);
+  try {
+    // Nota: El backend retorna void (200 OK) según la documentación del usuario en algunos casos, 
+    // pero idealmente retornaría la receta actualizada. Asumiremos que retorna la receta O void.
+    // Si retorna void, tendremos que volver a buscarla o retornar lo que enviamos transformado.
+    // Revisando el request del usuario: "response ... retorna json" con la receta.
+    const response = await axios.put<IReceta>('/receta/update-recipe-with-details/', payload);
+    console.log(`✅ Receta actualizada ID: ${payload.idReceta}`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error al actualizar receta:', error);
+    throw error;
+  }
 };
 
 /**
