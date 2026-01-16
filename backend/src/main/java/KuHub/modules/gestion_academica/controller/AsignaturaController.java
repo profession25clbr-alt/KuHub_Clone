@@ -4,6 +4,7 @@ import KuHub.modules.gestion_academica.dtos.dtomodel.CourseCreateDTO;
 import KuHub.modules.gestion_academica.dtos.dtomodel.CourseSolicitationResponseDTO;
 import KuHub.modules.gestion_academica.dtos.dtomodel.CourseUpdateDTO;
 import KuHub.modules.gestion_academica.dtos.dtomodel.CourserAnswerDTGOD;
+import KuHub.modules.gestion_academica.dtos.projection.CourseSolicitationSelectView;
 import KuHub.modules.gestion_academica.entity.Asignatura;
 import KuHub.modules.gestion_academica.exceptions.GestionAcademicaException;
 import KuHub.modules.gestion_academica.service.AsignaturaService;
@@ -41,6 +42,12 @@ public class AsignaturaController {
         return ResponseEntity
                 .status(200)
                 .body(asignaturaService.findAllCourserActiveTrueWithSeccion());
+    }
+
+    @GetMapping("/coruses-active-for-select")
+    public ResponseEntity<List<CourseSolicitationSelectView>> getActiveCoursesForSelect() {
+        // Retorna la lista de asignaturas activas usando la proyección ligera
+        return ResponseEntity.ok(asignaturaService.getActiveCoursesForSelect());
     }
 
     @GetMapping("/find-all-courses-for-solicitation")

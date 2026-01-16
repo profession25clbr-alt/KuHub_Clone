@@ -3,6 +3,7 @@ package KuHub.modules.gestion_solicitud.repository;
 import KuHub.modules.gestion_solicitud.dtos.proyeccion.ProductoUnidadView;
 import KuHub.modules.gestion_solicitud.dtos.proyeccion.SeccionInscritosView;
 import KuHub.modules.gestion_solicitud.dtos.proyeccion.SectionAvailabilityView;
+import KuHub.modules.gestion_solicitud.dtos.proyeccion.ManagementSolicitationView;
 import KuHub.modules.gestion_solicitud.entity.Solicitud;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -63,6 +64,55 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Integer> {
     List<SectionAvailabilityView> checkSectionAvailability(
             @Param("idSemana") Integer idSemana,
             @Param("idsSecciones") List<Integer> idsSecciones
+    );
+
+
+    @Query(value = """
+    SELECT  
+        S.ID_SOLICITUD,
+        CONCAT_WS(' ', 
+            U.P_NOMBRE, 
+            NULLIF(U.S_NOMBRE, ''), 
+            U.APP_PATERNO, 
+            NULLIF(U.APP_MATERNO, '')
+        ) AS NOMBRE_PROFESOR,
+        
+        A.NOMBRE_ASIGNATURA,
+        S.FECHA_SOLICITADA,  
+        CASE 
+            WHEN S.ID_RECETA IS NULL THEN 'RECETA NO ASIGNADA' 
+            ELSE R.NOMBRE_RECETA 
+        END AS NOMBRE_RECETA,
+        S.ESTADO_SOLICITUD,
+        COALESCE(C.CANTIDAD_PRODUCTOS, 0) AS TOTAL_PRODUCTOS
+    FROM SOLICITUD S
+    LEFT JOIN SEMANAS SM ON S.FECHA_SOLICITADA BETWEEN SM.FECHA_INICIO AND SM.FECHA_FIN
+    LEFT JOIN RECETA R ON R.ID_RECETA = S.ID_RECETA 
+    JOIN SECCION SC ON S.ID_SECCION = SC.ID_SECCION
+    JOIN ASIGNATURA A ON A.ID_ASIGNATURA = SC.ID_ASIGNATURA
+    JOIN DOCENTE_SECCION DC ON DC.ID_SECCION = S.ID_SECCION 
+    JOIN USUARIO U ON U.ID_USUARIO = DC.ID_USUARIO
+    LEFT JOIN (
+        SELECT ID_SOLICITUD, COUNT(*) AS CANTIDAD_PRODUCTOS
+        FROM DETALLE_SOLICITUD
+        GROUP BY ID_SOLICITUD
+    ) C ON C.ID_SOLICITUD = S.ID_SOLICITUD
+    WHERE 
+        (:idDocente IS NULL OR U.ID_USUARIO = :idDocente)
+        AND 
+        (:idSemana IS NULL OR SM.ID_SEMANA = :idSemana)
+        AND 
+        (:idAsignatura IS NULL OR A.ID_ASIGNATURA = :idAsignatura) 
+        AND 
+        (:estadoSolicitud IS NULL OR CAST(S.ESTADO_SOLICITUD AS text) = :estadoSolicitud)
+
+    ORDER BY S.FECHA_SOLICITADA ASC
+    """, nativeQuery = true)
+    List<ManagementSolicitationView> findSolicitudesDinamicas(
+            @Param("idDocente") Integer idDocente,
+            @Param("idSemana") Integer idSemana,
+            @Param("idAsignatura") Integer idAsignatura,
+            @Param("estadoSolicitud") String estadoSolicitud // <--- NUEVO PARAMETRO
     );
 
     @Query(value = "SELECT id_seccion AS idSeccion, cant_inscritos AS numInscritos " +

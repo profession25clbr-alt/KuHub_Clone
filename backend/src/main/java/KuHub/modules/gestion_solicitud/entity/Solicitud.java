@@ -29,6 +29,9 @@ public class Solicitud {
     @Column(name = "id_seccion", nullable = false)
     private Integer idSeccion;
 
+    @Column(name = "id_receta")
+    private Integer idReceta;
+
     @Column(name = "fecha_solicitada", nullable = false)
     private LocalDate fechaSolicitada;
 
@@ -53,7 +56,7 @@ public class Solicitud {
 
     public enum EstadoSolicitud {
         PENDIENTE,
-        ASIGNADA,
+        ACEPTADA,
         PROCESADO,
         RECHAZADA
     }
