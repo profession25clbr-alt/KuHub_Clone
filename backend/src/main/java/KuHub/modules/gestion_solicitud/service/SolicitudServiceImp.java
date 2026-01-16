@@ -1,10 +1,8 @@
 package KuHub.modules.gestion_solicitud.service;
 
-import KuHub.modules.gestion_academica.service.AsignaturaService;
 import KuHub.modules.gestion_receta.entity.DetalleReceta;
 import KuHub.modules.gestion_receta.services.DetalleRecetaService;
 import KuHub.modules.gestion_solicitud.dtos.*;
-import KuHub.modules.gestion_solicitud.dtos.proyeccion.ManagementSolicitationView;
 import KuHub.modules.gestion_solicitud.dtos.proyeccion.ProductoUnidadView;
 import KuHub.modules.gestion_solicitud.dtos.proyeccion.SeccionInscritosView;
 import KuHub.modules.gestion_solicitud.dtos.proyeccion.SectionAvailabilityView;
@@ -13,7 +11,6 @@ import KuHub.modules.gestion_solicitud.entity.Solicitud;
 import KuHub.modules.gestion_solicitud.repository.SolicitudRepository;
 import KuHub.modules.gestion_usuario.dtos.record.UserIdNameDTO;
 import KuHub.modules.gestion_usuario.service.UsuarioService;
-import KuHub.modules.semanas.service.SemanaService;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,54 +32,11 @@ public class SolicitudServiceImp implements SolicitudService{
     private DetalleRecetaService detalleRecetaService;
     @Autowired
     private UsuarioService usuarioService;
-    @Autowired
-    private SemanaService semanaService;
-    @Autowired
-    private AsignaturaService asignaturaService;
-
-
-    @Override
-    @Transactional(readOnly = true)
-    public ManagementSolicitationSelectorsDTO getSelectorsForManagement() {
-        return new ManagementSolicitationSelectorsDTO(
-                semanaService.getActiveWeeksForSelect(),
-                asignaturaService.getActiveCoursesForSelect(),
-                usuarioService.obtenerDocentesYProfesoresActivos()
-        );
-    }
 
     @Transactional(readOnly = true)
     @Override
     public List<SectionAvailabilityView> checkSectionAvailability (CheckSectionAvailabilityRequestDTO r){
         return solicitudRepository.checkSectionAvailability(r.getIdSemana(),r.getIdsSecciones());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ManagementSolicitationView> getManagementSolicitations(ManagementSolicitationRequestDTO request) {
-        return solicitudRepository.findSolicitudesDinamicas(
-                normalizarFiltro(request.getIdUsuarioDocente()),
-                normalizarFiltro(request.getIdSemana()),
-                normalizarFiltro(request.getIdAsignatura()),
-                normalizarTexto(request.getEstadoSolicitud())
-        );
-    }
-    /**
-     * Método auxiliar para limpiar los IDs que vienen del Front.
-     * Convierte el 0 (común en combos "Seleccionar todo") a null.
-     */
-    private Integer normalizarFiltro(Integer id) {
-        // Si es null o es menor o igual a 0, retornamos null
-        if (id == null || id <= 0) {
-            return null;
-        }
-        return id;
-    }
-    private String normalizarTexto(String texto) {
-        if (texto == null || texto.trim().isEmpty() || texto.equalsIgnoreCase("Todos los estados") || texto.equalsIgnoreCase("Kuhub")) {
-            return null;
-        }
-        return texto;
     }
 
     @Transactional
@@ -177,12 +131,10 @@ public class SolicitudServiceImp implements SolicitudService{
 
             Solicitud solicitud = new Solicitud();
             solicitud.setIdUsuarioGestorSolicitud(idUsuarioAutenticado);
-            solicitud.setIdReceta(request.getIdReceta());
             solicitud.setIdSeccion(ctx.getIdSeccion());
             solicitud.setFechaSolicitada(ctx.getFechaSolicitada());
             solicitud.setObservaciones(request.getObservaciones());
             solicitud.setEstadoSolicitud(Solicitud.EstadoSolicitud.PENDIENTE);
-
 
             Set<Integer> idsAdicionalesProcesados = new HashSet<>();
 

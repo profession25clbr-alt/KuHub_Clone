@@ -1,7 +1,6 @@
 package KuHub.modules.gestion_academica.service;
 
 import KuHub.modules.gestion_academica.dtos.dtomodel.*;
-import KuHub.modules.gestion_academica.dtos.projection.CourseSolicitationSelectView;
 import KuHub.modules.gestion_academica.entity.Asignatura;
 import KuHub.modules.gestion_academica.entity.AsignaturaProfesorCargo;
 import KuHub.modules.gestion_academica.entity.ReservaSala;
@@ -201,12 +200,6 @@ public class AsignaturaServiceImp implements AsignaturaService{
                 throw new RuntimeException("Error en el procesamiento de datos de asignaturas");
             }
         }).collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<CourseSolicitationSelectView> getActiveCoursesForSelect() {
-        return asignaturaRepository.findAllActiveCoursesView();
     }
 
     @Transactional
